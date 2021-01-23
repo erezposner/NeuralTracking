@@ -3,6 +3,23 @@ import time
 import copy
 import open3d as o3d
 import numpy as np
+import flowiz as fz
+import matplotlib.pyplot as plt
+
+
+def visualize_outputs(images_dict, writer, iteration_number):
+    rows = 1
+    cols = 2
+    gt_flow_img = fz.convert_from_flow(
+        images_dict['optical_flow_gt'][0].permute(1, 2, 0).detach().cpu().numpy())
+    pred_flow_img = fz.convert_from_flow(
+        images_dict['optical_flow_pred'][0].permute(1, 2, 0).detach().cpu().numpy())
+    f = plt.figure(figsize=(15, 15))
+    a = f.add_subplot(rows, cols, 1)
+    plt.imshow(gt_flow_img, cmap="jet")
+    a = f.add_subplot(rows, cols, 2)
+    plt.imshow(pred_flow_img, cmap="jet")
+    writer.add_figure('val_optical_flow', f, iteration_number)
 
 
 def transform_pointcloud_to_opengl_coords(points_cv):
@@ -36,11 +53,11 @@ class CustomDrawGeometryWithKeyCallback():
 
         self.rotating = False
         self.stop_rotating = False
-        
-        self.source_pcd = geometry_dict["source_pcd"] 
-        self.source_obj = geometry_dict["source_obj"] 
-        self.target_pcd = geometry_dict["target_pcd"] 
-        self.graph      = geometry_dict["graph"] 
+
+        self.source_pcd = geometry_dict["source_pcd"]
+        self.source_obj = geometry_dict["source_obj"]
+        self.target_pcd = geometry_dict["target_pcd"]
+        self.graph      = geometry_dict["graph"]
 
         # align source to target
         self.valid_source_points_cached = alignment_dict["valid_source_points"]
@@ -75,7 +92,7 @@ class CustomDrawGeometryWithKeyCallback():
             if ref == "target":
                 vis.remove_geometry(self.source_obj)
                 self.added_source_obj = False
-            
+
             self.added_both = False
 
     def get_name_of_object_to_record(self):
@@ -92,10 +109,10 @@ class CustomDrawGeometryWithKeyCallback():
                 return "source_pcd"
             if self.added_source_obj:
                 return "source_obj"
-                
+
         if self.added_target_pcd:
             return "target_pcd"
-    
+
     def custom_draw_geometry_with_key_callback(self):
 
         def toggle_graph(vis):
@@ -113,7 +130,7 @@ class CustomDrawGeometryWithKeyCallback():
                 for g in self.graph:
                     vis.add_geometry(g)
                 self.added_graph = True
-            
+
             ctr = vis.get_view_control()
             ctr.convert_from_pinhole_camera_parameters(param)
 
@@ -125,7 +142,7 @@ class CustomDrawGeometryWithKeyCallback():
             if self.added_both:
                 print("-- will not toggle obj. First, press either S or T, for source or target pcd")
                 return False
-            
+
             param = vis.get_view_control().convert_to_pinhole_camera_parameters()
 
             # Add source obj
@@ -150,7 +167,7 @@ class CustomDrawGeometryWithKeyCallback():
             print("::view_source")
 
             self.clear_for(vis, "source")
-            
+
             param = vis.get_view_control().convert_to_pinhole_camera_parameters()
 
             if not self.added_source_pcd:
@@ -172,7 +189,7 @@ class CustomDrawGeometryWithKeyCallback():
             print("::view_target")
 
             self.clear_for(vis, "target")
-            
+
             param = vis.get_view_control().convert_to_pinhole_camera_parameters()
 
             if not self.added_target_pcd:
@@ -180,7 +197,7 @@ class CustomDrawGeometryWithKeyCallback():
                 self.added_target_pcd = True
 
             self.remove_both_pcd_and_object(vis, "source")
-            
+
             ctr = vis.get_view_control()
             ctr.convert_from_pinhole_camera_parameters(param)
 
@@ -188,9 +205,9 @@ class CustomDrawGeometryWithKeyCallback():
 
         def view_both(vis):
             print("::view_both")
-            
+
             param = vis.get_view_control().convert_to_pinhole_camera_parameters()
-            
+
             if self.added_source_pcd:
                 vis.add_geometry(self.source_obj)
                 vis.remove_geometry(self.source_pcd)
@@ -232,7 +249,7 @@ class CustomDrawGeometryWithKeyCallback():
             ctr.rotate(0.4, 0.0)
             vis.poll_events()
             vis.update_renderer()
-            
+
             return False
 
         def rotate_slightly_left_and_right(vis):
@@ -262,14 +279,14 @@ class CustomDrawGeometryWithKeyCallback():
                     h_speed = abs_speed
                 elif move == 'r' or move == 'ro' or move == 'ri':
                     h_speed = -abs_speed
-                
+
                 if move == 'lo':
                     zoom_speed = abs_zoom
                 elif move == 'ro':
                     zoom_speed = abs_zoom / 4.0
                 elif move == 'li' or move == 'ri':
                     zoom_speed = -abs_zoom
-                    
+
                 for _ in iters_to_move[move_idx]:
                     ctr = vis.get_view_control()
 
@@ -309,7 +326,7 @@ class CustomDrawGeometryWithKeyCallback():
             ctr.rotate(0.4, 0.0)
             vis.poll_events()
             vis.update_renderer()
-            
+
             return False
 
         def align(vis):
@@ -336,14 +353,14 @@ class CustomDrawGeometryWithKeyCallback():
                     h_speed = abs_speed
                 elif move == 'r' or move == 'ro' or move == 'ri':
                     h_speed = -abs_speed
-                
+
                 if move == 'lo':
                     zoom_speed = abs_zoom
                 elif move == 'ro':
                     zoom_speed = abs_zoom/50.0
                 elif move == 'li' or move == 'ri':
                     zoom_speed = -abs_zoom/5.0
-                    
+
                 for _ in iters_to_move[move_idx]:
                     ctr = vis.get_view_control()
 
@@ -360,7 +377,7 @@ class CustomDrawGeometryWithKeyCallback():
                         ctr.rotate(h_speed, 0.0)
                         if move == 'lo' or move == 'ro' or move == 'li' or move == 'ri':
                             ctr.scale(zoom_speed)
-                    
+
                     vis.poll_events()
                     vis.update_renderer()
 
@@ -388,7 +405,7 @@ class CustomDrawGeometryWithKeyCallback():
                 return False
 
             param = vis.get_view_control().convert_to_pinhole_camera_parameters()
-            
+
             if self.added_corresp:
                 vis.remove_geometry(self.good_matches_set)
                 vis.remove_geometry(self.bad_matches_set)

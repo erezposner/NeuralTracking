@@ -22,7 +22,7 @@ from utils import nnutils
 from model.model import DeformNet
 from model.loss import DeformLoss
 import utils.query as query
-
+from utils.viz_utils import visualize_outputs
 
 if __name__ == "__main__":
     torch.set_num_threads(opt.num_threads)
@@ -256,11 +256,11 @@ if __name__ == "__main__":
 
                     print()
                     print("Train evaluation")
-                    train_losses, train_metrics = evaluate.evaluate(model, criterion, train_dataloader, num_eval_batches, "train")
+                    train_losses, train_metrics, train_debug_images = evaluate.evaluate(model, criterion, train_dataloader, num_eval_batches, "train",export_images=True)
                     
                     print()
                     print("Val   evaluation")
-                    val_losses, val_metrics     = evaluate.evaluate(model, criterion, val_dataloader, num_eval_batches, "val")
+                    val_losses, val_metrics, val_debug_images     = evaluate.evaluate(model, criterion, val_dataloader, num_eval_batches, "val",export_images=True)
 
                     train_writer.add_scalar('Loss/Loss',        train_losses["total"],  iteration_number)
                     train_writer.add_scalar('Loss/Flow',        train_losses["flow"],   iteration_number)
@@ -285,7 +285,9 @@ if __name__ == "__main__":
                     val_writer.add_scalar('Metrics/Graph_Error_3D',       val_metrics["epe3d"],        iteration_number)
                     val_writer.add_scalar('Metrics/EPE_3D',               val_metrics["epe_warp"],     iteration_number)
                     val_writer.add_scalar('Metrics/ValidRatio',           val_metrics["valid_ratio"],  iteration_number)
-                
+
+                    visualize_outputs(val_debug_images,val_writer,iteration_number)
+
                     print()
                     print()
                     print("Epoch number {0}, Iteration number {1}".format(epoch, iteration_number))
