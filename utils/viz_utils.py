@@ -5,20 +5,32 @@ import open3d as o3d
 import numpy as np
 import flowiz as fz
 import matplotlib.pyplot as plt
+import torch
 
 
 def visualize_outputs(images_dict, writer, iteration_number):
-    rows = 1
-    cols = 2
+    rows = 2
+    cols = 1
     gt_flow_img = fz.convert_from_flow(
         images_dict['optical_flow_gt'][0].permute(1, 2, 0).detach().cpu().numpy())
     pred_flow_img = fz.convert_from_flow(
         images_dict['optical_flow_pred'][0].permute(1, 2, 0).detach().cpu().numpy())
+
+    flow_mask = images_dict['optical_flow_mask'][0][0,...] # flow_mask is duplicated across the feature dimension
+    flow_mask_float = flow_mask.type(torch.int).detach().cpu().numpy()[...,None]
+
     f = plt.figure(figsize=(15, 15))
+    ax = plt.Axes(f, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    f.add_axes(ax)
+
     a = f.add_subplot(rows, cols, 1)
-    plt.imshow(gt_flow_img, cmap="jet")
+    a.set_title("gt_flow_img flow")
+    plt.imshow(gt_flow_img * flow_mask_float, cmap="jet")
+
     a = f.add_subplot(rows, cols, 2)
-    plt.imshow(pred_flow_img, cmap="jet")
+    a.set_title("pred_flow_img flow")
+    plt.imshow(pred_flow_img * flow_mask_float, cmap="jet")
     writer.add_figure('val_optical_flow', f, iteration_number)
 
 

@@ -10,7 +10,7 @@ from model import dataset
 from utils import nnutils
 
 
-def evaluate(model, criterion, dataloader, batch_num, split):
+def evaluate(model, criterion, dataloader, batch_num, split,export_images=False):
     dataset_obj = dataloader.dataset
     dataset_batch_size = dataloader.batch_size
     total_size = len(dataset_obj)
@@ -210,8 +210,16 @@ def evaluate(model, criterion, dataloader, batch_num, split):
         "num_total_solves": num_total_solves,
         "valid_ratio": valid_ratio,
     }
+    if export_images:
+        images = {
+            "optical_flow_gt": optical_flow_gt,
+            "optical_flow_pred": optical_flow_pred,
+            "optical_flow_mask": optical_flow_mask,
 
-    return losses, metrics
+        }
+        return losses, metrics,images
+    else:
+        return losses, metrics
 
 
 if __name__ == "__main__":

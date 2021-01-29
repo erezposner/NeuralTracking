@@ -56,7 +56,7 @@ if __name__ == "__main__":
     # Ask user input regarding the use of data augmentation
     #####################################################################################
     # Confirm hyperparameters
-    opt.print_hyperparams()
+    # opt.print_hyperparams()
 
     print()
     print("train_dir        ", train_dir)
@@ -273,6 +273,8 @@ if __name__ == "__main__":
                     train_writer.add_scalar('Metrics/Graph_Error_3D',       train_metrics["epe3d"],        iteration_number)
                     train_writer.add_scalar('Metrics/EPE_3D',               train_metrics["epe_warp"],     iteration_number)
                     train_writer.add_scalar('Metrics/ValidRatio',           train_metrics["valid_ratio"],  iteration_number)
+
+                    visualize_outputs(train_debug_images,train_writer,iteration_number)
 
                     val_writer.add_scalar('Loss/Loss',      val_losses["total"],    iteration_number)
                     val_writer.add_scalar('Loss/Flow',      val_losses["flow"],     iteration_number)
