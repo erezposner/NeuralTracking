@@ -24,12 +24,16 @@ def main():
     # Source-target example
 
     split = "test"
-    seq_id = 17
+    seq_id = 20#17
+    seq_id = 17#17
 
-    src_id = 300 # source frame
-    tgt_id = 600 # target frame
+    src_id = 600 #300 source frame
+    src_id = 300 #300 source frame
+    tgt_id = 700 #600 target frame
+    tgt_id = 600 #600 target frame
 
-    srt_tgt_str = "5dbd7c9104df0300f329f294_shirt_000300_000600_geodesic_0.05"
+    srt_tgt_str = f'5dbd7c9104df0300f329f294_shirt_000{src_id:03d}_000{tgt_id:03d}_geodesic_0.05'
+    # srt_tgt_str = f'5c6d6590608bda01b8a65bdf_Adult0_{src_id:06d}_{tgt_id:06d}_geodesic_0.05'
 
     # Make sure to use the intrinsics corresponding to the seq_id above!!  
     intrinsics = {

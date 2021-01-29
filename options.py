@@ -4,14 +4,14 @@ import os
 # DATA OPTIONS
 #####################################################################################################################
 # dataset_base_dir    = "/cluster/lothlann/data/nonrigid/public/"
-dataset_base_dir    = "/mnt/slurm_cluster/lothlann/data/nonrigid/hidden/"
+dataset_base_dir    = "/mnt/datasets/DeepDeformDS"
 workspace           = "."
 experiments_dir     = os.path.join(workspace, "experiments")
 
 image_width = 640
 image_height = 448
-num_worker_threads = 6
-num_threads = 4
+num_worker_threads = 6 # TODO 6
+num_threads = 4 # TODO 4
 
 num_samples_eval = 700 
 
@@ -23,9 +23,11 @@ num_samples_eval = 700
 # - In train.py, this info is only used if use_pretrained_model=True
 # - In generate.py, evaluate.py or example_viz.py, it is used regardless of the value of use_pretrained_model
 
-use_pretrained_model = False # used only in train.py
+# use_pretrained_model = False # used only in train.py
+use_pretrained_model = True # used only in train.py
 
 model_module_to_load = "full_model"    # A: "only_flow_net", B: "full_model"
+# model_name           = "chairs_things"       # your model's name
 model_name           = "model_A"       # your model's name
 model_iteration      = 0               # iteration number of the model you want to load
 

@@ -53,6 +53,7 @@ gn_max_mean_translation_error = 0.5
 # Losses
 #####################################################################################################################
 # Architecture parameters
+use_depth_loss     = False; lambda_depth = 5.0
 use_flow_loss      = False; lambda_flow = 0.0
 use_graph_loss     = True; lambda_graph = 1000.0
 use_warp_loss      = True; lambda_warp  = 1000.0
