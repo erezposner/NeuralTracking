@@ -235,9 +235,9 @@ class RobustL1(nn.Module):
     def forward(self, flow_gt, flow_pred, flow_mask):
         batch_size = flow_gt.shape[0]
 
-        assert flow_gt.shape[1]   == 2 or flow_gt.shape[1]   == 3, flow_gt.shape 
-        assert flow_pred.shape[1] == 2 or flow_pred.shape[1] == 3, flow_pred.shape 
-        assert flow_mask.shape[1] == 2 or flow_mask.shape[1] == 3, flow_mask.shape 
+        assert flow_gt.shape[1]   == 2 or flow_gt.shape[1]   == 3, flow_gt.shape
+        assert flow_pred.shape[1] == 2 or flow_pred.shape[1] == 3, flow_pred.shape
+        assert flow_mask.shape[1] == 2 or flow_mask.shape[1] == 3, flow_mask.shape
 
 
         flow_mask_float = flow_mask[:,0,...] # flow_mask is duplicated across the feature dimension
@@ -276,9 +276,9 @@ class L2(nn.Module):
         assert flow_pred.shape[1] == 2 or flow_pred.shape[1] == 3, flow_pred.shape 
         assert flow_mask.shape[1] == 2 or flow_mask.shape[1] == 3, flow_mask.shape
 
-        assert torch.isfinite(flow_gt).all()
-        assert torch.isfinite(flow_pred).all()
-        assert torch.isfinite(flow_mask).all()
+        # assert torch.isfinite(flow_gt).all()
+        # assert torch.isfinite(flow_pred).all()
+        # assert torch.isfinite(flow_mask).all()
 
         flow_mask_float = flow_mask[:,0,...] # flow_mask is duplicated across the feature dimension
         flow_mask_float = flow_mask_float.type(torch.float32)
@@ -286,7 +286,10 @@ class L2(nn.Module):
         diff = flow_pred - flow_gt
         lossvalue = torch.norm(diff, p=2, dim=1)
         lossvalue = lossvalue * flow_mask_float
-        assert torch.isfinite(lossvalue).all()
+        # assert torch.isfinite(lossvalue).all()
+        if torch.isfinite(lossvalue).all():
+            loss = torch.zeros((batch_size), dtype=lossvalue.dtype, device=lossvalue.device)
+            return loss
 
         loss = torch.zeros((batch_size), dtype=lossvalue.dtype, device=lossvalue.device)
         mask = []
@@ -378,7 +381,10 @@ def EPE_Warp(points_gt, points_pred, points_mask):
     epe = torch.norm(diff, p=2, dim=2)
 
     epe = epe * points_mask_float
-    assert torch.isfinite(epe).all()
+    if not torch.isfinite(epe).all():
+        epe[torch.isnan(epe)]=1e16
+
+    # assert torch.isfinite(epe).all()
 
     return {"sum": epe.sum().item(), "num": points_mask_float.sum().item(), "raw": epe[points_mask_bool].cpu().numpy()}
 
@@ -396,8 +402,10 @@ def EPE_3D(flow_gt, flow_pred, deformations_validity):
 
     diff = flow_pred - flow_gt
     epe = torch.norm(diff, p=2, dim=2)
-    epe = deformations_mask * epe 
-    assert torch.isfinite(epe).all()
+    epe = deformations_mask * epe
+    if not torch.isfinite(epe).all():
+        epe[torch.isnan(epe)]=1e16
+    # assert torch.isfinite(epe).all()
 
     return {"sum": epe.sum().item(), "num": deformations_validity.sum().item(), "raw": epe[deformations_mask_bool].cpu().numpy()}
 
