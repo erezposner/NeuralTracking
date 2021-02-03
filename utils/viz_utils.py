@@ -8,30 +8,88 @@ import matplotlib.pyplot as plt
 import torch
 
 
-def visualize_outputs(images_dict, writer, iteration_number):
-    rows = 2
-    cols = 1
-    gt_flow_img = fz.convert_from_flow(
-        images_dict['optical_flow_gt'][0].permute(1, 2, 0).detach().cpu().numpy())
-    pred_flow_img = fz.convert_from_flow(
-        images_dict['optical_flow_pred'][0].permute(1, 2, 0).detach().cpu().numpy())
+def visualize_outputs(images_dict, writer, iteration_number, title=''):
+    show_optical_flow = False
+    show_depth_pred = True
+    ######## Visualize optical flow prediction #########
+    if show_optical_flow:
+        rows = 1
+        cols = 2
+        gt_flow_img = fz.convert_from_flow(images_dict['optical_flow_gt'][0].permute(1, 2, 0).detach().cpu().numpy())
+        pred_flow_img = fz.convert_from_flow(images_dict['optical_flow_pred'][0].permute(1, 2, 0).detach().cpu().numpy())
 
-    flow_mask = images_dict['optical_flow_mask'][0][0,...] # flow_mask is duplicated across the feature dimension
-    flow_mask_float = flow_mask.type(torch.int).detach().cpu().numpy()[...,None]
+        flow_mask = images_dict['optical_flow_mask'][0][0,...] # flow_mask is duplicated across the feature dimension
+        flow_mask_float = flow_mask.type(torch.int).detach().cpu().numpy()[...,None]
 
-    f = plt.figure(figsize=(15, 15))
-    ax = plt.Axes(f, [0., 0., 1., 1.])
-    ax.set_axis_off()
-    f.add_axes(ax)
+        f = plt.figure(figsize=(15, 15))
+        ax = plt.Axes(f, [0., 0., 1., 1.])
+        ax.set_axis_off()
+        f.add_axes(ax)
 
-    a = f.add_subplot(rows, cols, 1)
-    a.set_title("gt_flow_img flow")
-    plt.imshow(gt_flow_img * flow_mask_float, cmap="jet")
+        a = f.add_subplot(rows, cols, 1)
+        a.set_title("gt_flow_img flow")
+        a.set_axis_off()
 
-    a = f.add_subplot(rows, cols, 2)
-    a.set_title("pred_flow_img flow")
-    plt.imshow(pred_flow_img * flow_mask_float, cmap="jet")
-    writer.add_figure('val_optical_flow', f, iteration_number)
+        plt.imshow(gt_flow_img * flow_mask_float, cmap="jet")
+
+        a = f.add_subplot(rows, cols, 2)
+        a.set_axis_off()
+        a.set_title("pred_flow_img flow")
+        plt.imshow(pred_flow_img * flow_mask_float, cmap="jet")
+        f.tight_layout()
+
+        writer.add_figure(title + '_optical_flow', f, iteration_number, close=True)
+
+    ######## Visualize depth prediction #########
+    if show_depth_pred:
+        rows = 2
+        cols = 2
+        depth_mask = images_dict['optical_flow_mask'][0][0, ...]  # flow_mask is duplicated across the feature dimension
+        depth_mask_float = depth_mask.type(torch.int).detach().cpu().numpy()
+        f = plt.figure(figsize=(6, 4))
+        ax = plt.Axes(f, [0., 0., 1., 1.])
+        ax.set_axis_off()
+        f.add_axes(ax)
+        print('------------------------------------------------------------')
+        print('------------------------------------------------------------')
+        print('------------------------------------------------------------')
+        source_depth_gt = images_dict['source_depth_gt'][0].permute(1, 2, 0).detach().cpu().numpy()
+        target_depth_gt = images_dict['target_depth_gt'][0].permute(1, 2, 0).detach().cpu().numpy()
+        source_depth_gt_Z = source_depth_gt[..., 2]
+        target_depth_gt_Z = target_depth_gt[..., 2]
+        source_depth_gt_masked = source_depth_gt_Z * depth_mask_float
+        # max_z_value = max(source_depth_gt_masked.flatten())
+        # min_z_value = min(source_depth_gt_viz.flatten())
+        viz_max = 4
+        print(f'source_depth_gt_masked - {np.mean(source_depth_gt_masked.flatten())}')
+        a = f.add_subplot(rows, cols, 1)
+        a.set_axis_off()
+        a.set_title("source_depth_gt")
+        plt.imshow(source_depth_gt_masked, cmap="jet")
+        plt.clim(0, viz_max)
+        a = f.add_subplot(rows, cols, 3)
+        a.set_axis_off()
+        a.set_title("target_depth_gt")
+        plt.imshow(target_depth_gt_Z, cmap="jet")
+        plt.clim(0, viz_max)
+        depth_pred_source = images_dict['depth_pred_source'][0].squeeze().detach().cpu().numpy()
+        depth_pred_target = images_dict['depth_pred_target'][0].squeeze().detach().cpu().numpy()
+        depth_pred_source_masked = depth_pred_source * depth_mask_float
+        print(f'depth_pred_source_masked - {np.mean(depth_pred_source_masked.flatten())}')
+        a = f.add_subplot(rows, cols, 2)
+        a.set_axis_off()
+        a.set_title("depth_pred_source")
+        plt.imshow(depth_pred_source_masked, cmap="jet")
+        plt.clim(0, viz_max)
+
+        a = f.add_subplot(rows, cols, 4)
+        a.set_axis_off()
+        a.set_title("depth_pred_target")
+        plt.imshow(depth_pred_target, cmap="jet")
+        plt.clim(0, viz_max)
+        f.tight_layout()
+        # plt.show()
+        writer.add_figure(title + '_depth_prediction', f, iteration_number, close=True)
 
 
 def transform_pointcloud_to_opengl_coords(points_cv):

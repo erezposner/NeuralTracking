@@ -8,29 +8,73 @@ import matplotlib.pyplot as plt
 import re
 from skimage import io
 from PIL import Image
+import torch.nn as nn
 
 from utils import flow_vis
 
+def debug_pcls(pred, gt,rgb_pred=None,gt_rgb = None):
+    import open3d as o3d
+    point_cloud_0 = o3d.geometry.PointCloud()
+    point0 = pred.squeeze().permute(1, 0).detach().cpu().numpy()
+    point_cloud_0.points = o3d.utility.Vector3dVector(point0)
+    if rgb_pred is not None:
+        color = rgb_pred[0].permute(1, 2, 0).view(-1, 3).detach().cpu().numpy()
+        point_cloud_0.colors = o3d.utility.Vector3dVector(color)
+    else:
+        point_cloud_0.paint_uniform_color([1, 0.706, 0])
+
+    point_cloud_1 = o3d.geometry.PointCloud()
+    point1 = gt.squeeze().permute(1, 0).detach().cpu().numpy()
+    point_cloud_1.points = o3d.utility.Vector3dVector(point1)
+    if gt_rgb is not None:
+        color = gt_rgb[0].permute(1, 2, 0).view(-1, 3).detach().cpu().numpy()
+        point_cloud_0.colors = o3d.utility.Vector3dVector(color)
+    else:
+        point_cloud_1.paint_uniform_color([0, 0.651, 0.929])
+
+    o3d.visualization.draw_geometries([point_cloud_0, point_cloud_1])
+
+def debug_depthmaps(pred, gt,rgb_pred=None,gt_rgb = None):
+    import open3d as o3d
+    point_cloud_0 = o3d.geometry.PointCloud()
+    point0 = pred.squeeze().view(3, -1).permute(1, 0).detach().cpu().numpy()
+    point_cloud_0.points = o3d.utility.Vector3dVector(point0)
+    if rgb_pred is not None:
+        color = rgb_pred[0].permute(1, 2, 0).view(-1, 3).detach().cpu().numpy()
+        point_cloud_0.colors = o3d.utility.Vector3dVector(color)
+    else:
+        point_cloud_0.paint_uniform_color([1, 0.706, 0])
+
+    point_cloud_1 = o3d.geometry.PointCloud()
+    point1 = gt.squeeze().view(3, -1).permute(1, 0).detach().cpu().numpy()
+    point_cloud_1.points = o3d.utility.Vector3dVector(point1)
+    if gt_rgb is not None:
+        color = gt_rgb[0].permute(1, 2, 0).view(-1, 3).detach().cpu().numpy()
+        # point_cloud_1.colors = o3d.utility.Vector3dVector(color)
+    else:
+        point_cloud_1.paint_uniform_color([0, 0.651, 0.929])
+
+    o3d.visualization.draw_geometries([point_cloud_0, point_cloud_1])
 
 def show_mask_image(image_numpy):
     assert image_numpy.dtype == np.bool
     image_to_show = np.copy(image_numpy)
     image_to_show = (image_to_show * 255).astype(np.uint8)
-    
+
     img = Image.fromarray(image_to_show)
     img.show()
 
 
 def save_rgb_image(filename, image_numpy):
     image_to_save = np.copy(image_numpy)
-    
+
     if image_to_save.shape[0] == 3:
         image_to_save = np.moveaxis(image_to_save, 0, -1)
-    
+
     assert image_to_save.shape[-1] == 3, "image has {} channels, so it's not rgb, you liar!".format(image_to_save.shape[-1])
 
     if image_to_save.dtype == "float32":
-        
+
         assert np.max(image_to_save) <= 1.0
 
         image_to_save = image_to_save * 255.0
@@ -42,7 +86,7 @@ def save_rgb_image(filename, image_numpy):
 def save_grayscale_image(filename, image_numpy):
     image_to_save = np.copy(image_numpy)
     image_to_save = (image_to_save * 255).astype(np.uint8)
-    
+
     if len(image_to_save.shape) == 2:
         io.imsave(filename, image_to_save)
     elif len(image_to_save.shape) == 3:
@@ -143,7 +187,7 @@ def load_flow_binary(filename):
 def save_flow_binary(filename, flow):
     # Flow is stored row-wise in order [channels, height, width].
     assert len(flow.shape) == 3
-    
+
     with open(filename, 'wb') as fout:
         fout.write(struct.pack('I', flow.shape[2]))
         fout.write(struct.pack('I', flow.shape[1]))
@@ -214,13 +258,13 @@ def load_graph_nodes(filename):
         nodes = np.asarray(nodes, dtype=np.float32).reshape([num_nodes, 3])
 
     return nodes
-    
+
 
 def save_graph_nodes(filename, nodes):
     # Node positions are stored row-wise in order [num_nodes, 3].
     assert len(nodes.shape) == 2
     assert(nodes.shape[1] == 3)
-    
+
     with open(filename, 'wb') as fout:
         fout.write(struct.pack('I', nodes.shape[0]))
         fout.write(struct.pack('={}f'.format(nodes.size), *nodes.flatten("C")))
@@ -239,12 +283,12 @@ def load_graph_edges(filename):
         edges = np.asarray(edges, dtype=np.int32).reshape([num_nodes, num_neighbors])
 
     return edges
-    
+
 
 def save_graph_edges(filename, edges):
     # Graph edges are stored row-wise in order [num_nodes, num_edges].
     assert len(edges.shape) == 2
-    
+
     with open(filename, 'wb') as fout:
         fout.write(struct.pack('I', edges.shape[0]))
         fout.write(struct.pack('I', edges.shape[1]))
@@ -268,7 +312,7 @@ def load_graph_edges_weights(filename):
 def save_graph_edges_weights(filename, edges_weights):
     # Graph edges are stored row-wise in order [num_nodes, num_edges].
     assert len(edges_weights.shape) == 2
-    
+
     with open(filename, 'wb') as fout:
         fout.write(struct.pack('I', edges_weights.shape[0]))
         fout.write(struct.pack('I', edges_weights.shape[1]))
@@ -287,13 +331,13 @@ def load_graph_node_deformations(filename):
         node_deformations = np.asarray(node_deformations, dtype=np.float32).reshape([num_nodes, 3])
 
     return node_deformations
-    
+
 
 def save_graph_node_deformations(filename, node_deformations):
     # Node deformations are stored row-wise in order [num_nodes, 3].
     assert len(node_deformations.shape) == 2
     assert(node_deformations.shape[1] == 3)
-    
+
     with open(filename, 'wb') as fout:
         fout.write(struct.pack('I', node_deformations.shape[0]))
         fout.write(struct.pack('={}f'.format(node_deformations.size), *node_deformations.flatten("C")))
@@ -316,7 +360,7 @@ def load_graph_clusters(filename):
 def save_graph_clusters(filename, clusters):
     # Graph clusters are stored row-wise in order [num_nodes, 1].
     assert len(clusters.shape) == 2
-    
+
     with open(filename, 'wb') as fout:
         fout.write(struct.pack('I', clusters.shape[0]))
         fout.write(struct.pack('I', clusters.shape[1]))
@@ -338,13 +382,13 @@ def load_float_image(filename):
         image = np.asarray(image, dtype=np.float32).reshape([xdim, ydim, zdim])
 
     return image
-    
+
 def save_float_image(filename, image_input):
     image = np.copy(image_input)
 
     # Image is stored row-wise in order [xdim, ydim, zdim].
     assert len(image.shape) == 3
-    
+
     with open(filename, 'wb') as fout:
         fout.write(struct.pack('I', image.shape[2]))
         fout.write(struct.pack('I', image.shape[1]))
@@ -357,7 +401,7 @@ def save_int_image(filename, image_input):
 
     # Image is stored row-wise in order [xdim, ydim, zdim].
     assert len(image.shape) == 3
-    
+
     with open(filename, 'wb') as fout:
         fout.write(struct.pack('I', image.shape[2]))
         fout.write(struct.pack('I', image.shape[1]))
@@ -489,13 +533,13 @@ def overlay_images(image_original_1, image_original_2, alpha=0.5):
 def draw_optical_flow_and_save(flow_image, filename):
     # Make copy of flow image
     flow_image_vis = np.copy(flow_image)
-    
+
     # If channels are on first axis, move to last
     if flow_image_vis.shape[0] == 2:
         flow_image_vis = np.moveaxis(flow_image_vis, 0, -1)
 
     assert flow_image_vis.shape[2] == 2
-    
+
     # Set to 0 if invalid
     flow_image_vis[flow_image_vis == -np.Inf] = 0.0
     flow_image_vis[flow_image_vis == np.Inf] = 0.0
@@ -547,5 +591,35 @@ def find_best_model_name(model_dirname, data_version, verbose=False):
         if model_step == str(best_step):
             assert best_model_name == None
             best_model_name = mn
-        
+
     return os.path.splitext(best_model_name)[0]
+
+class Backproject(nn.Module):
+    def __init__(self, batch_size, height, width, device):
+        super(Backproject, self).__init__()
+
+        self.batch_size = batch_size
+        self.height = height
+        self.width = width
+        self.device = device
+
+        meshgrid = np.meshgrid(range(self.width), range(self.height), indexing='xy')
+        self.id_coords = np.stack(meshgrid, axis=0).astype(np.float32)
+        self.id_coords = torch.from_numpy(self.id_coords)
+        self.ones = torch.ones(self.batch_size, 1, self.height * self.width)
+        self.ones = self.ones.to(self.device)
+        self.pix_coords = torch.unsqueeze(torch.stack([self.id_coords[0].view(-1), self.id_coords[1].view(-1)], 0), 0)
+        self.pix_coords = self.pix_coords.repeat(batch_size, 1, 1).to(self.device)
+        self.pix_coords = torch.cat([self.pix_coords, self.ones], 1)
+        self.pix_coords = self.pix_coords.to(self.device)
+
+
+    def forward(self, depth, inv_K):
+        cam_points = torch.matmul(inv_K[:,0, :3, :3],self.pix_coords)
+        cam_points = depth.view(self.batch_size, 1, -1) * cam_points
+
+        # cam_points = torch.cat([cam_points, self.ones], 1)
+        return cam_points.view(self.batch_size, 3, self.height,self.width)
+
+
+

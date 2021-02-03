@@ -5,8 +5,11 @@
 do_validation = True
 
 # Freeze parts of the model
+freeze_depth_pred_net     = True
 freeze_optical_flow_net   = False
 freeze_mask_net           = False
+
+use_depth_prediction = False
 
 # Shuffle batch
 shuffle = True
@@ -53,7 +56,7 @@ gn_max_mean_translation_error = 0.5
 # Losses
 #####################################################################################################################
 # Architecture parameters
-use_depth_loss     = False; lambda_depth = 5.0
+use_depth_pred_loss= False; lambda_depth_pred = 5.0
 use_flow_loss      = True; lambda_flow = 5.0
 use_graph_loss     = False; lambda_graph = 2.0
 use_warp_loss      = False; lambda_warp  = 2.0

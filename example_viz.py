@@ -173,7 +173,7 @@ def main():
     mask_pred = mask_pred.view(-1, opt.image_height, opt.image_width).cpu().numpy()
 
     # Compute mask gt for mask baseline
-    _, source_points, valid_source_points, target_matches, \
+    _, gt_source_points, source_points, valid_source_points, target_matches, \
         valid_target_matches, valid_correspondences, _, \
             _ = model_data["correspondence_info"]
 

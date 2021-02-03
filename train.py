@@ -116,6 +116,27 @@ if __name__ == "__main__":
             if opt.model_module_to_load == "full_model":
                 # Load completely model            
                 model.load_state_dict(pretrained_dict)
+
+            elif opt.model_module_to_load == "full_model_execpt_depth":
+                # Load everything except depth
+                model_dict = model.state_dict()
+                # 1. filter out unnecessary keys
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if "depth_pred_net" not in k}
+                # 2. overwrite entries in the existing state dict
+                model_dict.update(pretrained_dict)
+                # 3. load the new state dict
+                model.load_state_dict(model_dict)
+
+            elif opt.model_module_to_load == "depth_pred_net":
+                # Load only optical flow part
+                model_dict = model.state_dict()
+                # 1. filter out unnecessary keys
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if "depth_pred_net" in k}
+                # 2. overwrite entries in the existing state dict
+                model_dict.update(pretrained_dict)
+                # 3. load the new state dict
+                model.load_state_dict(model_dict)
+
             elif opt.model_module_to_load == "only_flow_net":
                 # Load only optical flow part
                 model_dict = model.state_dict()
@@ -130,7 +151,7 @@ if __name__ == "__main__":
                 exit()
 
     # Criterion.
-    criterion = DeformLoss(opt.lambda_flow, opt.lambda_graph, opt.lambda_warp, opt.lambda_mask, opt.flow_loss_type)
+    criterion = DeformLoss(opt.lambda_depth_pred, opt.lambda_flow, opt.lambda_graph, opt.lambda_warp, opt.lambda_mask, opt.flow_loss_type)
 
     # Count parameters.
     n_all_model_params = int(sum([np.prod(p.size()) for p in model.parameters()]))
@@ -144,6 +165,11 @@ if __name__ == "__main__":
     n_all_masknet_params = int(sum([np.prod(p.size()) for p in model.mask_net.parameters()]))
     n_trainable_masknet_params = int(sum([np.prod(p.size()) for p in filter(lambda p: p.requires_grad, model.mask_net.parameters())]))
     print("-> Mask network: {0} / {1}".format(n_trainable_masknet_params, n_all_masknet_params))
+    print()
+
+    n_all_depth_pred_net_params = int(sum([np.prod(p.size()) for p in model.depth_pred.parameters()]))
+    n_trainable_depth_pred_params = int(sum([np.prod(p.size()) for p in filter(lambda p: p.requires_grad, model.depth_pred.parameters())]))
+    print("-> Depth Pred network: {0} / {1}".format(n_all_depth_pred_net_params, n_all_depth_pred_net_params))
     print()
 
     # Set up optimizer.
@@ -257,47 +283,50 @@ if __name__ == "__main__":
                     print()
                     print("Train evaluation")
                     train_losses, train_metrics, train_debug_images = evaluate.evaluate(model, criterion, train_dataloader, num_eval_batches, "train",export_images=True)
-                    
+
                     print()
                     print("Val   evaluation")
                     val_losses, val_metrics, val_debug_images     = evaluate.evaluate(model, criterion, val_dataloader, num_eval_batches, "val",export_images=True)
 
-                    train_writer.add_scalar('Loss/Loss',        train_losses["total"],  iteration_number)
-                    train_writer.add_scalar('Loss/Flow',        train_losses["flow"],   iteration_number)
-                    train_writer.add_scalar('Loss/Graph',       train_losses["graph"], iteration_number)
-                    train_writer.add_scalar('Loss/Warp',        train_losses["warp"],   iteration_number)
-                    train_writer.add_scalar('Loss/Mask',        train_losses["mask"],   iteration_number)
-                    
+                    train_writer.add_scalar('Loss/Loss',        train_losses["total"],      iteration_number)
+                    train_writer.add_scalar('Loss/Depth_Pred',  train_losses["depth_pred"], iteration_number)
+                    train_writer.add_scalar('Loss/Flow',        train_losses["flow"],       iteration_number)
+                    train_writer.add_scalar('Loss/Graph',       train_losses["graph"],      iteration_number)
+                    train_writer.add_scalar('Loss/Warp',        train_losses["warp"],       iteration_number)
+                    train_writer.add_scalar('Loss/Mask',        train_losses["mask"],       iteration_number)
+
                     train_writer.add_scalar('Metrics/EPE_2D_0',             train_metrics["epe2d_0"],      iteration_number)
                     train_writer.add_scalar('Metrics/EPE_2D_2',             train_metrics["epe2d_2"],      iteration_number)
                     train_writer.add_scalar('Metrics/Graph_Error_3D',       train_metrics["epe3d"],        iteration_number)
                     train_writer.add_scalar('Metrics/EPE_3D',               train_metrics["epe_warp"],     iteration_number)
                     train_writer.add_scalar('Metrics/ValidRatio',           train_metrics["valid_ratio"],  iteration_number)
 
-                    visualize_outputs(train_debug_images,train_writer,iteration_number)
+                    visualize_outputs(train_debug_images, train_writer, iteration_number, title='train_debug_images')
 
                     val_writer.add_scalar('Loss/Loss',      val_losses["total"],    iteration_number)
+                    val_writer.add_scalar('Loss/Depth_Pred',val_losses["depth_pred"],iteration_number)
                     val_writer.add_scalar('Loss/Flow',      val_losses["flow"],     iteration_number)
                     val_writer.add_scalar('Loss/Graph',     val_losses["graph"],   iteration_number)
                     val_writer.add_scalar('Loss/Warp',      val_losses["warp"],     iteration_number)
                     val_writer.add_scalar('Loss/Mask',      val_losses["mask"],     iteration_number)
-                    
+
                     val_writer.add_scalar('Metrics/EPE_2D_0',             val_metrics["epe2d_0"],      iteration_number)
                     val_writer.add_scalar('Metrics/EPE_2D_2',             val_metrics["epe2d_2"],      iteration_number)
                     val_writer.add_scalar('Metrics/Graph_Error_3D',       val_metrics["epe3d"],        iteration_number)
                     val_writer.add_scalar('Metrics/EPE_3D',               val_metrics["epe_warp"],     iteration_number)
                     val_writer.add_scalar('Metrics/ValidRatio',           val_metrics["valid_ratio"],  iteration_number)
 
-                    visualize_outputs(val_debug_images,val_writer,iteration_number)
+                    visualize_outputs(val_debug_images, val_writer, iteration_number, title='val_debug_images')
 
                     print()
                     print()
                     print("Epoch number {0}, Iteration number {1}".format(epoch, iteration_number))
-                    print("{:<40} {}".format("Current Train Loss TOTAL",    train_losses["total"]))
-                    print("{:<40} {}".format("Current Train Loss FLOW",     train_losses["flow"]))
-                    print("{:<40} {}".format("Current Train Loss GRAPH",    train_losses["graph"]))
-                    print("{:<40} {}".format("Current Train Loss WARP",     train_losses["warp"]))
-                    print("{:<40} {}".format("Current Train Loss MASK",     train_losses["mask"]))
+                    print("{:<40} {}".format("Current Train Loss TOTAL",      train_losses["total"]))
+                    print("{:<40} {}".format("Current Train Loss DEPTH_PRED", train_losses["depth_pred"]))
+                    print("{:<40} {}".format("Current Train Loss FLOW",       train_losses["flow"]))
+                    print("{:<40} {}".format("Current Train Loss GRAPH",      train_losses["graph"]))
+                    print("{:<40} {}".format("Current Train Loss WARP",       train_losses["warp"]))
+                    print("{:<40} {}".format("Current Train Loss MASK",       train_losses["mask"]))
                     print()
                     print("{:<40} {}".format("Current Train EPE 2D_0",            train_metrics["epe2d_0"]))
                     print("{:<40} {}".format("Current Train EPE 2D_2",            train_metrics["epe2d_2"]))
@@ -307,6 +336,7 @@ if __name__ == "__main__":
                     print()
 
                     print("{:<40} {}".format("Current Val Loss TOTAL",      val_losses["total"]))
+                    print("{:<40} {}".format("Current Val Loss DEPTH_PRED", val_losses["depth_pred"]))
                     print("{:<40} {}".format("Current Val Loss FLOW",       val_losses["flow"]))
                     print("{:<40} {}".format("Current Val Loss GRAPH",      val_losses["graph"]))
                     print("{:<40} {}".format("Current Val Loss WARP",       val_losses["warp"]))
@@ -324,15 +354,15 @@ if __name__ == "__main__":
 
                     # We compute the time of IO as the complete time, subtracted by all processing time.
                     time_statistics.io_duration += (timer() - complete_cycle_start - time_statistics.train_duration - time_statistics.eval_duration)
-                    
-                    # Set CUDA_LAUNCH_BLOCKING=1 environmental variable for reliable timings. 
+
+                    # Set CUDA_LAUNCH_BLOCKING=1 environmental variable for reliable timings.
                     print("Cycle duration (s): {0:3f} (IO: {1:3f}, TRAIN: {2:3f}, EVAL: {3:3f})".format(
                         timer() - time_statistics.start_time, time_statistics.io_duration, time_statistics.train_duration, time_statistics.eval_duration
                     ))
                     print("FORWARD: {0:3f}, LOSS: {1:3f}, BACKWARD: {2:3f}".format(
                         time_statistics.forward_duration, time_statistics.loss_eval_duration, time_statistics.backward_duration
-                    ))                       
-                    print()   
+                    ))
+                    print()
 
                     time_statistics = TimeStatistics()
                     complete_cycle_start = timer()
@@ -340,7 +370,7 @@ if __name__ == "__main__":
                     sys.stdout.flush()
 
                     model.train()
-                
+
                 else:
                     sys.stdout.write("\r############# Train iteration: {0} / {1} (of Epoch {2}) - {3}".format(
                         iteration_number % opt.evaluation_frequency + 1, opt.evaluation_frequency, epoch, experiment_name)
@@ -372,6 +402,8 @@ if __name__ == "__main__":
                 pixel_weights        = pixel_weights.cuda()
                 intrinsics           = intrinsics.cuda()
 
+                source_depth_gt = source[:, 3:, :, :]
+                target_depth_gt = target[:, 3:, :, :]
                 train_batch_start = timer()
 
                 #####################################################################################
@@ -385,7 +417,8 @@ if __name__ == "__main__":
                     pixel_anchors, pixel_weights, 
                     num_nodes, intrinsics
                 )
-                
+                source_depth_pred = model_data["depth_pred_data"][0][('depth', -1, -1)]
+                target_depth_pred = model_data["depth_pred_data"][1][('depth', -1, -1)]
                 time_statistics.forward_duration += (timer() - train_batch_forward_pass)
 
                 # Invalidate too for too far away estimations, since they can produce
@@ -414,21 +447,21 @@ if __name__ == "__main__":
                     )    
 
                     # Compute mask gt for mask baseline
-                    xy_coords_warped, source_points, valid_source_points, target_matches, \
+                    xy_coords_warped, gt_source_points,  source_points, valid_source_points, target_matches, \
                         valid_target_matches, valid_correspondences, deformed_points_idxs, \
                             deformed_points_subsampled = model_data["correspondence_info"]
 
                     mask_gt, valid_mask_pixels = nnutils.compute_baseline_mask_gt(
                         xy_coords_warped, 
                         target_matches, valid_target_matches,
-                        source_points, valid_source_points,
+                        gt_source_points, valid_source_points,
                         scene_flow_gt, scene_flow_mask, target_boundary_mask,
                         opt.max_pos_flowed_source_to_target_dist, opt.min_neg_flowed_source_to_target_dist
                     )
 
                     # Compute deformed point gt
                     deformed_points_gt, deformed_points_mask = nnutils.compute_deformed_points_gt(
-                        source_points, scene_flow_gt, 
+                        gt_source_points, scene_flow_gt,
                         model_data["valid_solve"], valid_correspondences, 
                         deformed_points_idxs, deformed_points_subsampled
                     )
@@ -440,6 +473,7 @@ if __name__ == "__main__":
 
                 # Compute Loss
                 loss = criterion(
+                    [source_depth_pred], [source_depth_gt], [target_depth_pred], [target_depth_gt],[optical_flow_mask],
                     flow_gts, model_data["flow_data"], flow_masks,
                     translations_gt, model_data["node_translations"], model_data["deformations_validity"],
                     deformed_points_gt, model_data["deformed_points_pred"], deformed_points_mask,
@@ -455,10 +489,33 @@ if __name__ == "__main__":
                 train_batch_backprop = timer()
 
                 # We only backprop if any of the losses is non-zero.
-                if opt.use_flow_loss or opt.use_mask_loss or torch.sum(model_data["valid_solve"]) > 0:
+                if opt.use_depth_pred_loss or opt.use_flow_loss or opt.use_mask_loss or torch.sum(model_data["valid_solve"]) > 0:
                     optimizer.zero_grad()
                     loss.backward()
-                 
+
+                    def plot_grad_flow(named_parameters):
+                        import matplotlib.pyplot as plt
+                        ave_grads = []
+                        layers = []
+                        for n, p in named_parameters:
+                            if (p.requires_grad) and ("bias" not in n):
+                                layers.append(n)
+                                # print(n)
+                                try:
+                                    ave_grads.append(p.grad.abs().mean())
+                                except:
+                                    pass
+                        plt.plot(ave_grads, alpha=0.3, color="b")
+                        plt.hlines(0, 0, len(ave_grads) + 1, linewidth=1, color="k")
+                        plt.xticks(range(0, len(ave_grads), 1), layers, rotation="vertical")
+                        plt.xlim(xmin=0, xmax=len(ave_grads))
+                        plt.xlabel("Layers")
+                        plt.ylabel("average gradient")
+                        plt.title("Gradient flow")
+                        plt.grid(True)
+                        plt.show()
+                    if iteration_number % opt.evaluation_frequency == 0:
+                        plot_grad_flow(model.named_parameters())
                     optimizer.step()
                     if opt.use_lr_scheduler: scheduler.step()
                     

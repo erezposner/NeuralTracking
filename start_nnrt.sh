@@ -10,7 +10,7 @@ docker stop portainer
 docker stop ml_docker_ne
 docker rm portainer
 docker rm ml_docker_ne
-docker build -t ml_docker_ne .  --build-arg NNRT_PATH=$LOCAL_SRC_DIR
+#docker build -t ml_docker_ne .  --build-arg NNRT_PATH=$LOCAL_SRC_DIR
 
 #Running
 docker volume create portainer_dat

@@ -17,6 +17,7 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
 
     # Losses
     loss_sum = 0.0
+    loss_depth_pred_sum = 0.0
     loss_flow_sum = 0.0
     loss_graph_sum = 0.0
     loss_warp_sum = 0.0
@@ -46,7 +47,7 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
     print()
 
     for i, data in enumerate(dataloader):
-        if i >= total_num_batches: 
+        if i >= total_num_batches:
             break
 
         sys.stdout.write("\r############# Eval iteration: {0} / {1}".format(i + 1, total_num_batches))
@@ -91,6 +92,10 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
                 num_nodes, intrinsics, 
                 evaluate=True, split=split
             )
+            source_depth_pred = model_data["depth_pred_data"][0][('depth', -1, -1)]
+            target_depth_pred = model_data["depth_pred_data"][1][('depth', -1, -1)]
+            source_depth_gt = source[:, 3:, :, :]
+            target_depth_gt = target[:, 3:, :, :]
             optical_flow_pred2 = model_data["flow_data"][0]
             optical_flow_pred = 20.0 * torch.nn.functional.interpolate(input=optical_flow_pred2, size=(opt.image_height, opt.image_width), mode='bilinear', align_corners=False)
             
@@ -100,27 +105,28 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
             total_corres_valid_num += model_data["weight_info"]["total_corres_num"]
 
             # Compute mask gt for mask baseline
-            xy_coords_warped, source_points, valid_source_points, target_matches, \
+            xy_coords_warped, gt_source_points, source_points, valid_source_points, target_matches, \
                 valid_target_matches, valid_correspondences, deformed_points_idxs, \
                     deformed_points_subsampled = model_data["correspondence_info"]
 
             mask_gt, valid_mask_pixels = nnutils.compute_baseline_mask_gt(
                 xy_coords_warped, 
                 target_matches, valid_target_matches,
-                source_points, valid_source_points,
+                gt_source_points, valid_source_points,
                 scene_flow_gt, scene_flow_mask, target_boundary_mask,
                 opt.max_pos_flowed_source_to_target_dist, opt.min_neg_flowed_source_to_target_dist
             )
 
             # Compute deformed point gt
             deformed_points_gt, deformed_points_mask = nnutils.compute_deformed_points_gt(
-                source_points, scene_flow_gt, 
+                gt_source_points, scene_flow_gt,
                 model_data["valid_solve"], valid_correspondences, 
                 deformed_points_idxs, deformed_points_subsampled
             )
 
             # Loss.
-            loss, loss_flow, loss_graph, loss_warp, loss_mask = criterion(
+            loss, loss_depth_pred, loss_flow, loss_graph, loss_warp, loss_mask = criterion(
+                [source_depth_pred] , [source_depth_gt], [target_depth_pred] , [target_depth_gt],[optical_flow_mask],
                 [optical_flow_gt], [optical_flow_pred], [optical_flow_mask],
                 translations_gt, model_data["node_translations"], model_data["deformations_validity"],
                 deformed_points_gt, model_data["deformed_points_pred"], deformed_points_mask,
@@ -130,10 +136,11 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
             )
 
             loss_sum            += loss.item()
-            loss_flow_sum       += loss_flow.item()     if opt.use_flow_loss        else -1
-            loss_graph_sum      += loss_graph.item()    if opt.use_graph_loss       else -1
-            loss_warp_sum       += loss_warp.item()     if opt.use_warp_loss        else -1
-            loss_mask_sum       += loss_mask.item()     if opt.use_mask_loss        else -1
+            loss_depth_pred_sum += loss_depth_pred.item()  if opt.use_depth_pred_loss  else -1
+            loss_flow_sum       += loss_flow.item()        if opt.use_flow_loss        else -1
+            loss_graph_sum      += loss_graph.item()       if opt.use_graph_loss       else -1
+            loss_warp_sum       += loss_warp.item()        if opt.use_warp_loss        else -1
+            loss_mask_sum       += loss_mask.item()        if opt.use_mask_loss        else -1
 
             # Metrics.
             # A.1) End Point Error in Optical Flow for FINEST level
@@ -177,18 +184,20 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
                 total_num_points += epe_warp_dict["num"]
         
     # Losses
-    loss_avg            = loss_sum        / total_num_batches
-    loss_flow_avg       = loss_flow_sum   / total_num_batches
-    loss_graph_avg      = loss_graph_sum  / total_num_batches
-    loss_warp_avg       = loss_warp_sum   / total_num_batches
-    loss_mask_avg       = loss_mask_sum   / total_num_batches
+    loss_avg            = loss_sum             / total_num_batches
+    loss_depth_pred     = loss_depth_pred_sum  / total_num_batches
+    loss_flow_avg       = loss_flow_sum        / total_num_batches
+    loss_graph_avg      = loss_graph_sum       / total_num_batches
+    loss_warp_avg       = loss_warp_sum        / total_num_batches
+    loss_mask_avg       = loss_mask_sum        / total_num_batches
     
     losses = {
-        "total":    loss_avg,
-        "flow":     loss_flow_avg,
-        "graph":    loss_graph_avg,
-        "warp":     loss_warp_avg,
-        "mask":     loss_mask_avg
+        "total":      loss_avg,
+        "depth_pred": loss_depth_pred,
+        "flow":       loss_flow_avg,
+        "graph":      loss_graph_avg,
+        "warp":       loss_warp_avg,
+        "mask":       loss_mask_avg
     }
 
     # Metrics.
@@ -196,7 +205,7 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
     epe2d_avg_2       = epe2d_sum_2 / total_num_pixels_2        if total_num_pixels_2 > 0 else -1.0
     epe3d_avg         = epe3d_sum / total_num_nodes             if total_num_nodes    > 0 else -1.0
     epe_warp_avg      = epe_warp_sum / total_num_points         if total_num_points   > 0 else -1.0
-    valid_ratio       = num_valid_solves / num_total_solves     if num_total_solves   > 0 else -1
+    valid_ratio       = num_valid_solves / num_total_solves     if num_total_solves   > 0 else -1.0
 
     if total_corres_valid_num > 0:
         print(" Average correspondence weight: {0:.3f}".format(total_corres_weight_sum / total_corres_valid_num))
@@ -212,6 +221,10 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
     }
     if export_images:
         images = {
+            "depth_pred_source": source_depth_pred,
+            "depth_pred_target": target_depth_pred,
+            "source_depth_gt": source_depth_gt,
+            "target_depth_gt": target_depth_gt,
             "optical_flow_gt": optical_flow_gt,
             "optical_flow_pred": optical_flow_pred,
             "optical_flow_mask": optical_flow_mask,

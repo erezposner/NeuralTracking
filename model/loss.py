@@ -7,8 +7,9 @@ import math
 
 
 class DeformLoss(torch.nn.Module):
-    def __init__(self, lambda_flow=0, lambda_graph=0, lambda_warp=0, lambda_mask=0, flow_loss_type="L2"): # L1, L2, MSE (like L2 but w/o sqrt)
+    def __init__(self, lambda_depth_pred=0, lambda_flow=0, lambda_graph=0, lambda_warp=0, lambda_mask=0, depth_pred_loss_type="L2" ,flow_loss_type="L2"): # L1, L2, MSE (like L2 but w/o sqrt)
         super(DeformLoss, self).__init__()
+        self.lambda_depth_pred = lambda_depth_pred
         self.lambda_flow = lambda_flow
         self.lambda_graph = lambda_graph
         self.lambda_warp = lambda_warp
@@ -21,16 +22,68 @@ class DeformLoss(torch.nn.Module):
         else:
             raise Exception("Loss type {} is not defined. Valid losses are 'L1', 'L2' or 'MSE'".format(flow_loss_type))
 
+        if depth_pred_loss_type == 'RobustL1':
+            self.depth_pred_loss = torch.nn.L1Loss(reduction='none')
+        elif depth_pred_loss_type == 'L2':
+            self.depth_pred_loss = torch.nn.MSELoss(reduction='none')
+        else:
+            raise Exception("Loss type {} is not defined. Valid losses are 'L1', 'L2' or 'MSE'".format(depth_pred_loss_type))
+
         self.graph_loss = BatchGraphL2()
         self.warp_loss = L2_Warp()
 
-    def forward(self, flow_gts, flow_preds, flow_masks,
+
+    def forward(self, source_depth_pred, source_depth_gt, target_depth_pred, target_depth_gt,depth_pred_mask,
+                flow_gts, flow_preds, flow_masks,
                 deformations_gt, deformations_pred, deformations_validity,
                 warped_points_gt, warped_points_pred, warped_points_mask,
                 valid_solve, num_nodes_vec, mask_pred, mask_gt, valid_pixels,
                 evaluate=False):
 
         d_total = torch.zeros((1), dtype=flow_preds[0].dtype, device=flow_preds[0].device)
+
+        d_depth_pred = None
+        if opt.use_depth_pred_loss:
+            if len(source_depth_gt) == 1:
+                d_depth_pred = self.depth_pred_loss(source_depth_gt[0][:, -1, None, ...], source_depth_pred[0])
+
+
+                # mask_interpolated = torch.nn.functional.interpolate(input=optical_flow_mask[0][:, 0, None, :, :].float(), size=(d_depth_pred.shape[2], d_depth_pred.shape[3]), mode='nearest')
+                # import matplotlib.pyplot as plt
+                # plt.imshow((d_depth_pred * mask_interpolated).detach().cpu().numpy()[0][0])
+                # z_gt = source_depth_gt[0][:, -1, None, ...].detach().cpu().numpy()
+                # norm_val = z_gt[0][0].max()
+                # depth_pred_source_Z =( (z_gt[0][0] * 255.0 ) / norm_val).astype(
+                #     np.uint8)
+                # plt.imshow(depth_pred_source_Z)
+                # pred_vis = (source_depth_pred[0][0][0].detach().cpu().numpy()*255.0 / norm_val).astype(
+                #     np.uint8)
+                # plt.imshow(pred_vis)
+                # plt.imshow(source_depth_gt[0][:, -1, None, ...][0][0].detach().cpu().numpy()*depth_pred_mask[0][0][0].detach().cpu().numpy())
+                # plt.imshow(source_depth_gt[0][:, -1, None, ...][0][0].detach().cpu().numpy())
+                # p = source_depth_gt[0][:, -1, None, ...][0][0].detach().cpu().numpy()*depth_pred_mask[0][0][0].detach().cpu().numpy()
+                # plt.clim(min(p.flatten()), max(p.flatten()))
+                # plt.show()
+
+                d_depth_pred_src = (d_depth_pred * depth_pred_mask[0])
+                d_depth_pred_trg = self.depth_pred_loss(target_depth_gt[0][:, -1, None, ...], target_depth_pred[0])
+
+                d_depth_pred = 0.8*d_depth_pred_src.mean() + 0.2*d_depth_pred_trg.mean()
+
+            elif len(source_depth_gt) > 1:
+                d_depth_pred = []
+                # for flow_gt, flow_pred, flow_mask in zip(flow_gts, flow_preds, flow_masks):
+                for idx in range(len(source_depth_gt)):
+                    # It can happen that flow_gt has no valid values for coarser levels.
+                    # In that case, that level is not constrained in the batch.
+                    f = self.depth_pred_loss(source_depth_gt[idx][:,-1, None,...], source_depth_pred[idx])
+                    assert f is not None, f
+                    f += (self.depth_pred_loss(target_depth_gt[idx][:,-1, None,...], target_depth_pred[idx])).mean()
+
+                    d_depth_pred.append(f)
+                d_depth_pred = sum(d_depth_pred)
+
+            d_total += self.lambda_depth_pred * d_depth_pred
 
         d_flow = None
         if opt.use_flow_loss:
@@ -52,21 +105,31 @@ class DeformLoss(torch.nn.Module):
 
         d_graph = None
         if opt.use_graph_loss:
-            d_graph = self.graph_loss(deformations_gt, deformations_pred, valid_solve, deformations_validity)
-            d_total += self.lambda_graph * d_graph
+            try:
+                d_graph = self.graph_loss(deformations_gt, deformations_pred, valid_solve, deformations_validity)
+                d_total += self.lambda_graph * d_graph
+            except Exception as e:
+                print(f'\ncould not use graph_loss due to {e}\n')
+                d_graph = torch.tensor([0.0], requires_grad=True)
+
+                pass
 
         d_warp = None
         if opt.use_warp_loss:
-            d_warp = self.warp_loss(warped_points_gt, warped_points_pred, warped_points_mask)
-            d_total += self.lambda_warp * d_warp
-
+            try:
+                d_warp = self.warp_loss(warped_points_gt, warped_points_pred, warped_points_mask)
+                d_total += self.lambda_warp * d_warp
+            except Exception as e:
+                print(f'\ncould not use warp_loss due to {e}\n')
+                d_warp = torch.tensor([0.0], requires_grad=True)
+                pass
         d_mask = None
         if opt.use_mask_loss:
             d_mask = self.mask_bce_loss(mask_gt, mask_pred, valid_pixels)
             d_total += self.lambda_mask * d_mask
 
         if evaluate:
-            return d_total, d_flow, d_graph, d_warp, d_mask
+            return d_total, d_depth_pred, d_flow, d_graph, d_warp, d_mask
         else:
             return d_total
 

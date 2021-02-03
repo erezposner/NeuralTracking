@@ -10,10 +10,10 @@ experiments_dir     = os.path.join(workspace, "experiments")
 
 image_width = 640
 image_height = 448
-num_worker_threads = 6 # TODO 6
-num_threads = 4 # TODO 4
+num_worker_threads = 4 # TODO 6
+num_threads = 6 # TODO 4
 
-num_samples_eval = 700 
+num_samples_eval = 700
 
 #####################################################################################################################
 # MODEL INFO
@@ -24,22 +24,27 @@ num_samples_eval = 700
 # - In generate.py, evaluate.py or example_viz.py, it is used regardless of the value of use_pretrained_model
 
 # use_pretrained_model = False # used only in train.py
-use_pretrained_model = True # used only in train.py
+use_pretrained_model = True  # used only in train.py
 
-model_module_to_load = "full_model"    # A: "only_flow_net", B: "full_model"
+model_module_to_load = "full_model"    # A: "only_flow_net", B: "full_model", C: "full_model_execpt_depth", D:"depth_pred_net"
 # model_name           = "chairs_things"       # your model's name
-model_name           = "model_A"       # your model's name
-model_iteration      = 0               # iteration number of the model you want to load
+model_name           = "2021-02-02_depth_pred_1"       # your model's name - 38000
+model_name           = "2021-02-02_solver_0"       # your model's name - 60000
+# model_iteration      = 38000               # iteration number of the model you want to load
+model_iteration      = 60000               # iteration number of the model you want to load
 
 saved_model = os.path.join(experiments_dir, "models", model_name, f"{model_name}_{model_iteration}.pt")
 
 #####################################################################################################################
 # TRAINING OPTIONS
 #####################################################################################################################
-mode = "0_flow" # ["0_flow", "1_solver", "2_mask", "3_refine"]
+mode = "2_mask"  # ["_1_0_flow", "0_flow", "1_solver", "2_mask", "3_refine"]
+
 
 if mode == "0_flow":
     from settings.settings_flow import *
+elif mode == "_1_0_flow":
+    from settings.settings_depth import *
 elif mode == "1_solver":
     from settings.settings_solver import *
 elif mode == "2_mask":

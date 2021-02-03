@@ -1,4 +1,8 @@
+from utils.utils import Backproject, debug_pcls , debug_depthmaps
+from .mono_fm_joint.net import mono_fm_joint
 import sys,os
+import torch.nn.functional as F
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -97,6 +101,13 @@ class DeformNet(torch.nn.Module):
         self.gn_data_depth = 1.0
         self.gn_arap = 1.0
         self.gn_lm_factor = 0.1
+        # depth prediction network
+        # self.depth_pred = UNet(n_channels=3, bilinear=True)
+        self.depth_pred = mono_fm_joint(n_channels=3)
+        if opt.freeze_depth_pred_net:
+            # Freeze
+            for param in self.depth_pred.parameters():
+                param.requires_grad = False
 
         # Optical flow network
         self.flow_net = pwcnet.PWCNet()
@@ -149,13 +160,25 @@ class DeformNet(torch.nn.Module):
             })
 
         ########################################################################
+        # Compute intrinsics matrix
+        k_mat = torch.eye(4).repeat(opt.batch_size, 1, 1, 1).to('cuda')
+        k_mat[:, :, 0, 0] = intrinsics[:, 0].unsqueeze(-1)
+        k_mat[:, :, 1, 1] = intrinsics[:, 1].unsqueeze(-1)
+        k_mat[:, :, 0, 2] = intrinsics[:, 2].unsqueeze(-1)
+        k_mat[:, :, 1, 2] = intrinsics[:, 3].unsqueeze(-1)
+        k_inv_mat = k_mat.inverse()
+        ########################################################################
+
+        ########################################################################
         # Compute dense flow from source to target.
         ########################################################################
         flow2, flow3, flow4, flow5, flow6, features2 = self.flow_net.forward(x1[:,:3,:,:], x2[:,:3,:,:])
-        
-        assert torch.isfinite(flow2).all()
-        assert torch.isfinite(features2).all()
-        
+        # assert torch.isfinite(flow2).all()
+        # assert torch.isfinite(features2).all()
+
+        x1_depth_pred = self.depth_pred(x1[:, :3, :, :])
+        x2_depth_pred = self.depth_pred(x2[:, :3, :, :])
+
         flow = 20.0 * torch.nn.functional.interpolate(input=flow2, size=(image_height, image_width), mode='bilinear', align_corners=False)
 
         ########################################################################
@@ -195,10 +218,34 @@ class DeformNet(torch.nn.Module):
         ########################################################################
         # Mask out invalid source points.
         source_points = x1[:, 3:, :, :].clone()
-        source_anchor_validity = torch.all(pixel_anchors >= 0.0, dim=3)          
+        gt_source_points = x1[:, 3:, :, :].clone()
+        x1_depth_pred[('depth', -1, -1)] = F.interpolate(x1_depth_pred[('depth', 0, 0)], [source_points.shape[2], source_points.shape[3]],mode="nearest")
+
+
+        if opt.use_depth_prediction:
+            try:
+                backproject = Backproject(opt.batch_size, opt.image_height, opt.image_width, 'cuda')
+                pred_source_points = backproject.forward(x1_depth_pred[('depth', -1, -1)], k_inv_mat)
+                # debug_depthmaps(pred_source_points[0], source_points[0],x1[0,None, :3, :, :],x1[0,None, :3, :, :])
+                source_points = pred_source_points
+                # source_points[:, -1, None, :, :] = x1_depth_pred[('depth', -1, -1)]
+            except:
+                pass
+        source_anchor_validity = torch.all(pixel_anchors >= 0.0, dim=3)
 
         # Sample target points at computed pixel locations.
         target_points = x2[:, 3:, :, :].clone()
+        gt_target_points = x2[:, 3:, :, :].clone()
+        x2_depth_pred[('depth', -1, -1)] = F.interpolate(x2_depth_pred[('depth', 0, 0)], [target_points.shape[2], target_points.shape[3]],mode="nearest")
+        if opt.use_depth_prediction:
+            try:
+                backproject = Backproject(opt.batch_size, opt.image_height, opt.image_width, 'cuda')
+                pred_target_points = backproject.forward(x2_depth_pred[('depth', -1, -1)], k_inv_mat)
+                # debug_depthmaps(pred_target_points, target_points)
+                target_points = pred_target_points
+                # target_points[:, -1, None, :, :] = x2_depth_pred[('depth', -1, -1)]
+            except:
+                pass
         target_matches = torch.nn.functional.grid_sample(
             target_points, xy_coords_warped, mode=opt.gn_depth_sampling_mode, padding_mode='zeros', align_corners=False
         )
@@ -273,8 +320,10 @@ class DeformNet(torch.nn.Module):
 
         # Skip the solver
         if not evaluate and opt.skip_solver:
+        # if not evaluate or opt.skip_solver:
             return {
                 "flow_data": [flow2, flow3, flow4, flow5, flow6], 
+                "depth_pred_data": [x1_depth_pred, x2_depth_pred],
                 "node_rotations": node_rotations,
                 "node_translations": node_translations,
                 "deformations_validity": deformations_validity,
@@ -604,6 +653,7 @@ class DeformNet(torch.nn.Module):
                     jacobian_data[data_increment_vec_2_3,                   3 * node_idxs_k + 1] += lambda_data_depth * skew_symetric_mat_data[:, 2, 1]
                     jacobian_data[data_increment_vec_2_3,                   3 * node_idxs_k + 2] += lambda_data_depth * skew_symetric_mat_data[:, 2, 2]
 
+                    jacobian_data[~torch.isfinite(jacobian_data)] = 0
                     assert torch.isfinite(jacobian_data).all(), jacobian_data
 
                 res_data = torch.zeros((num_matches * 3, 1), dtype=x1.dtype, device=x1.device)
@@ -669,6 +719,7 @@ class DeformNet(torch.nn.Module):
                     jacobian_arap[arap_increment_vec_2_3,                   3 * node_idxs_0 + 1] += skew_symetric_mat_arap[:, 2, 1]
                     jacobian_arap[arap_increment_vec_2_3,                   3 * node_idxs_0 + 2] += skew_symetric_mat_arap[:, 2, 2]
 
+                    jacobian_arap[~torch.isfinite(jacobian_arap)] = 0
                     assert torch.isfinite(jacobian_arap).all(), jacobian_arap
                     
                 if opt.gn_print_timings: print("\t\tARAP term: {:.3f} s".format(timer() - timer_arap_start))
@@ -692,7 +743,7 @@ class DeformNet(torch.nn.Module):
 
                 # Solve linear system Ax = b.
                 A = A + torch.eye(A.shape[0], dtype=A.dtype, device=A.device) * lm_factor
-
+                A[~torch.isfinite(A)] = 0
                 assert torch.isfinite(A).all(), A
 
                 if opt.gn_print_timings: print("\t\tSystem computation: {:.3f} s".format(timer() - timer_system_start))
@@ -844,7 +895,8 @@ class DeformNet(torch.nn.Module):
                 valid_solve[i] = 0
 
         return {
-            "flow_data": [flow2, flow3, flow4, flow5, flow6], 
+            "flow_data": [flow2, flow3, flow4, flow5, flow6],
+            "depth_pred_data": [x1_depth_pred, x2_depth_pred],
             "node_rotations": node_rotations,
             "node_translations": node_translations,
             "deformations_validity": deformations_validity,
@@ -853,7 +905,7 @@ class DeformNet(torch.nn.Module):
             "mask_pred": mask_pred,
             "correspondence_info": [
                 xy_coords_warped, 
-                source_points, valid_source_points, 
+                gt_source_points, source_points, valid_source_points,
                 target_matches, valid_target_matches,
                 valid_correspondences, deformed_points_idxs, deformed_points_subsampled
             ], 
