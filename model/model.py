@@ -1,7 +1,8 @@
-from utils.utils import Backproject, debug_pcls , debug_depthmaps
+from utils.utils import Backproject, debug_pcls
 from .mono_fm_joint.net import mono_fm_joint
 import sys,os
 import torch.nn.functional as F
+from utils.utils import plot_3d_data_debug
 
 import torch
 import torch.nn as nn
@@ -226,7 +227,8 @@ class DeformNet(torch.nn.Module):
             try:
                 backproject = Backproject(opt.batch_size, opt.image_height, opt.image_width, 'cuda')
                 pred_source_points = backproject.forward(x1_depth_pred[('depth', -1, -1)], k_inv_mat)
-                # debug_depthmaps(pred_source_points[0], source_points[0],x1[0,None, :3, :, :],x1[0,None, :3, :, :])
+
+                # plot_3d_data_debug([pred_source_points[0], source_points[0]], [x1[0, :3, :, :],0*x1[0, :3, :, :]])
                 source_points = pred_source_points
                 # source_points[:, -1, None, :, :] = x1_depth_pred[('depth', -1, -1)]
             except:
@@ -241,7 +243,7 @@ class DeformNet(torch.nn.Module):
             try:
                 backproject = Backproject(opt.batch_size, opt.image_height, opt.image_width, 'cuda')
                 pred_target_points = backproject.forward(x2_depth_pred[('depth', -1, -1)], k_inv_mat)
-                # debug_depthmaps(pred_target_points, target_points)
+                # plot_3d_data_debug([pred_target_points[0], target_points[0]], [x1[0, :3, :, :],0*x1[0, :3, :, :]])
                 target_points = pred_target_points
                 # target_points[:, -1, None, :, :] = x2_depth_pred[('depth', -1, -1)]
             except:

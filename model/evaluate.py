@@ -8,6 +8,7 @@ import sys
 import options as opt
 from model import dataset
 from utils import nnutils
+from utils.utils import  plot_3d_data_debug
 
 
 def evaluate(model, criterion, dataloader, batch_num, split,export_images=False):
@@ -134,6 +135,15 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
                 model_data["mask_pred"], mask_gt, valid_mask_pixels,
                 evaluate=True
             )
+            #TODO Start from here
+            ind = 1
+            pcls = [source_points[ind],model_data["deformed_points_pred"][ind],deformed_points_gt[ind]]
+            pcls = [deformed_points_gt[ind]]
+            pcls_colors = [source[:, :3, :, :][ind],torch.zeros_like(source[:, :3, :, :][ind]),torch.ones_like(source[:, :3, :, :][ind])]
+            pcls_colors = [torch.zeros_like(source[:, :3, :, :][ind])]
+            plot_3d_data_debug(pcls=pcls,pcls_colors = pcls_colors)
+
+
 
             loss_sum            += loss.item()
             loss_depth_pred_sum += loss_depth_pred.item()  if opt.use_depth_pred_loss  else -1
