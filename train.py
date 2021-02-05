@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # Creating tf writer and folders 
     #####################################################################################
     # Writer initialization.
-    tf_runs = os.path.join(opt.experiments_dir, "tf_runs")
+    tf_runs = os.path.join(opt.experiments_dir, "tf_runs_1")
     log_name = "{0}_{1}".format(date, experiment_name)
     log_dir = os.path.join(tf_runs, log_name)
 

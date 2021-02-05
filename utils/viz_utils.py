@@ -42,54 +42,111 @@ def visualize_outputs(images_dict, writer, iteration_number, title=''):
 
     ######## Visualize depth prediction #########
     if show_depth_pred:
-        rows = 2
-        cols = 2
-        depth_mask = images_dict['optical_flow_mask'][0][0, ...]  # flow_mask is duplicated across the feature dimension
-        depth_mask_float = depth_mask.type(torch.int).detach().cpu().numpy()
-        f = plt.figure(figsize=(6, 4))
-        ax = plt.Axes(f, [0., 0., 1., 1.])
-        ax.set_axis_off()
-        f.add_axes(ax)
-        print('------------------------------------------------------------')
-        print('------------------------------------------------------------')
-        print('------------------------------------------------------------')
-        source_depth_gt = images_dict['source_depth_gt'][0].permute(1, 2, 0).detach().cpu().numpy()
-        target_depth_gt = images_dict['target_depth_gt'][0].permute(1, 2, 0).detach().cpu().numpy()
-        source_depth_gt_Z = source_depth_gt[..., 2]
-        target_depth_gt_Z = target_depth_gt[..., 2]
-        source_depth_gt_masked = source_depth_gt_Z * depth_mask_float
-        # max_z_value = max(source_depth_gt_masked.flatten())
-        # min_z_value = min(source_depth_gt_viz.flatten())
-        viz_max = 4
-        print(f'source_depth_gt_masked - {np.mean(source_depth_gt_masked.flatten())}')
-        a = f.add_subplot(rows, cols, 1)
-        a.set_axis_off()
-        a.set_title("source_depth_gt")
-        plt.imshow(source_depth_gt_masked, cmap="jet")
-        plt.clim(0, viz_max)
-        a = f.add_subplot(rows, cols, 3)
-        a.set_axis_off()
-        a.set_title("target_depth_gt")
-        plt.imshow(target_depth_gt_Z, cmap="jet")
-        plt.clim(0, viz_max)
-        depth_pred_source = images_dict['depth_pred_source'][0].squeeze().detach().cpu().numpy()
-        depth_pred_target = images_dict['depth_pred_target'][0].squeeze().detach().cpu().numpy()
-        depth_pred_source_masked = depth_pred_source * depth_mask_float
-        print(f'depth_pred_source_masked - {np.mean(depth_pred_source_masked.flatten())}')
-        a = f.add_subplot(rows, cols, 2)
-        a.set_axis_off()
-        a.set_title("depth_pred_source")
-        plt.imshow(depth_pred_source_masked, cmap="jet")
-        plt.clim(0, viz_max)
+        plot_predicted_depth_maps(images_dict,writer,title,iteration_number)
 
-        a = f.add_subplot(rows, cols, 4)
-        a.set_axis_off()
-        a.set_title("depth_pred_target")
-        plt.imshow(depth_pred_target, cmap="jet")
-        plt.clim(0, viz_max)
-        f.tight_layout()
-        # plt.show()
-        writer.add_figure(title + '_depth_prediction', f, iteration_number, close=True)
+        plot_point_clouds(images_dict,writer,title,iteration_number)
+    writer.close()
+
+
+
+def plot_point_clouds(images_dict,writer,title,iteration_number):
+
+    ind = 0
+    #
+    source_point_cloud_vertices = images_dict['source_point_cloud']['vertices'].detach().cpu()
+    source_point_cloud_colors = images_dict['source_point_cloud']['colors'].detach().cpu()
+    #
+    deformed_points_pred_vertices = images_dict['deformed_points_pred']['vertices'].detach().cpu()
+    deformed_points_pred_colors = images_dict['deformed_points_pred']['colors']
+
+    deformed_points_gt_vertices = images_dict['deformed_points_gt']['vertices'].detach().cpu()
+    deformed_points_gt_colors = images_dict['deformed_points_gt']['colors']
+
+    ### Plot using open3d
+    # # pcls = [source_point_cloud_vertices[ind], deformed_points_pred_vertices[ind], deformed_points_gt_vertices[ind]]
+    # # pcls_colors = [source_point_cloud_colors[ind], deformed_points_pred_colors[ind], deformed_points_gt_colors[ind]]
+    # # plot_3d_data_debug(pcls=pcls, pcls_colors=pcls_colors)
+
+    ### source_point_cloud
+    p1 = source_point_cloud_vertices[ind].view(3, -1).permute(1, 0).unsqueeze(0)
+    p1[...,1]*=-1
+    p1[...,2]*=-1
+    c1 =(source_point_cloud_colors[ind].view(3, -1).permute(1, 0).unsqueeze(0)*255).int()
+    c1 = c1.type(torch.int64)
+
+    ### deformed_points_pred_vertices
+    p2 = deformed_points_pred_vertices[ind].unsqueeze(0)
+    p2[...,1]*=-1
+    p2[...,2]*=-1
+
+    c2 = np.ones_like(p2, dtype=np.int32) * [0,255,255]
+    c2 = torch.as_tensor(c2)
+
+    ### deformed_points_gt
+    p3 = deformed_points_gt_vertices[ind].unsqueeze(0)
+    p3[...,1]*=-1
+    p3[...,2]*=-1
+    c3 = np.ones_like(p3, dtype=np.int32) * [255,0,0]
+    c3 = torch.as_tensor(c3)
+    pcls_tensor = torch.cat([p1,p2,p3], dim=1)
+    colors_tensor = torch.cat([c1,c2,c3], dim=1)
+    # pcls = torch.cat((p1,p2),dim=1)
+    # colors_tensor  = torch.cat((c1,c2),dim=1)
+    # writer.add_mesh('a', vertices=p1,colors=c1,global_step=iteration_number)
+
+    writer.add_mesh(title, vertices=pcls_tensor,colors=colors_tensor ,global_step=iteration_number)
+
+
+def plot_predicted_depth_maps(images_dict,writer,title,iteration_number):
+    rows = 2
+    cols = 2
+    depth_mask = images_dict['optical_flow_mask'][0][
+        0, ...]  # flow_mask is duplicated across the feature dimension
+    depth_mask_float = depth_mask.type(torch.int).detach().cpu().numpy()
+    f = plt.figure(figsize=(6, 4))
+    ax = plt.Axes(f, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    f.add_axes(ax)
+    print('------------------------------------------------------------')
+    print('------------------------------------------------------------')
+    print('------------------------------------------------------------')
+    source_depth_gt = images_dict['source_depth_gt'][0].permute(1, 2, 0).detach().cpu().numpy()
+    target_depth_gt = images_dict['target_depth_gt'][0].permute(1, 2, 0).detach().cpu().numpy()
+    source_depth_gt_Z = source_depth_gt[..., 2]
+    target_depth_gt_Z = target_depth_gt[..., 2]
+    source_depth_gt_masked = source_depth_gt_Z * depth_mask_float
+    # max_z_value = max(source_depth_gt_masked.flatten())
+    # min_z_value = min(source_depth_gt_viz.flatten())
+    viz_max = 4
+    print(f'source_depth_gt_masked - {np.mean(source_depth_gt_masked.flatten())}')
+    a = f.add_subplot(rows, cols, 1)
+    a.set_axis_off()
+    a.set_title("source_depth_gt")
+    plt.imshow(source_depth_gt_masked, cmap="jet")
+    plt.clim(0, viz_max)
+    a = f.add_subplot(rows, cols, 3)
+    a.set_axis_off()
+    a.set_title("target_depth_gt")
+    plt.imshow(target_depth_gt_Z, cmap="jet")
+    plt.clim(0, viz_max)
+    depth_pred_source = images_dict['depth_pred_source'][0].squeeze().detach().cpu().numpy()
+    depth_pred_target = images_dict['depth_pred_target'][0].squeeze().detach().cpu().numpy()
+    depth_pred_source_masked = depth_pred_source * depth_mask_float
+    print(f'depth_pred_source_masked - {np.mean(depth_pred_source_masked.flatten())}')
+    a = f.add_subplot(rows, cols, 2)
+    a.set_axis_off()
+    a.set_title("depth_pred_source")
+    plt.imshow(depth_pred_source_masked, cmap="jet")
+    plt.clim(0, viz_max)
+
+    a = f.add_subplot(rows, cols, 4)
+    a.set_axis_off()
+    a.set_title("depth_pred_target")
+    plt.imshow(depth_pred_target, cmap="jet")
+    plt.clim(0, viz_max)
+    f.tight_layout()
+    # plt.show()
+    writer.add_figure(title + '_depth_prediction', f, iteration_number, close=True)
 
 
 def transform_pointcloud_to_opengl_coords(points_cv):

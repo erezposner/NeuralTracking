@@ -33,12 +33,12 @@ def debug_pcls(pred, gt,rgb_pred=None,gt_rgb = None):
         point_cloud_1.paint_uniform_color([0, 0.651, 0.929])
 
     o3d.visualization.draw_geometries([point_cloud_0, point_cloud_1])
+def is_pcl(pcl):
+    return pcl.shape[-1] == 3
+
 def plot_3d_data_debug(pcls, pcls_colors=None):
     import open3d as o3d
     pcls_list = []
-
-    def is_pcl(pcl):
-        return pcl.shape[-1] == 3
 
     for i in range(len(pcls)):
 
@@ -48,7 +48,7 @@ def plot_3d_data_debug(pcls, pcls_colors=None):
         else:
             point0 = pcls[i].squeeze().view(3, -1).permute(1, 0).detach().cpu().numpy()
         point_cloud_0.points = o3d.utility.Vector3dVector(point0)
-        if pcls_colors is not None:
+        if pcls_colors[i] is not None:
             color = pcls_colors[i].permute(1, 2, 0).view(-1, 3).detach().cpu().numpy()
             point_cloud_0.colors = o3d.utility.Vector3dVector(color)
         else:

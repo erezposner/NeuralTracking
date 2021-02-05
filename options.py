@@ -31,8 +31,9 @@ model_module_to_load = "full_model"    # A: "only_flow_net", B: "full_model", C:
 # model_name           = "2021-02-02_depth_pred_1"       # your model's name - 38000
 # model_name           = "2021-02-02_solver_0"       # your model's name - 60000
 model_name           = "2021-02-03_mask_1"       # your model's name - 34000
-# model_iteration      = 38000               # iteration number of the model you want to load
+# model_name           = "model_A"       # your model's name - 34000
 model_iteration      = 34000               # iteration number of the model you want to load
+# model_iteration      = 0               # iteration number of the model you want to load
 
 saved_model = os.path.join(experiments_dir, "models", model_name, f"{model_name}_{model_iteration}.pt")
 
