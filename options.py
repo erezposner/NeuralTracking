@@ -4,7 +4,7 @@ import os
 # DATA OPTIONS
 #####################################################################################################################
 # dataset_base_dir    = "/cluster/lothlann/data/nonrigid/public/"
-dataset_base_dir    = "/mnt/slurm_cluster/lothlann/data/nonrigid/hidden/"
+dataset_base_dir    = "/mnt/datasets/DeepDeformDS"
 workspace           = "."
 experiments_dir     = os.path.join(workspace, "experiments")
 
