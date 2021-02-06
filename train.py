@@ -36,8 +36,8 @@ if __name__ == "__main__":
     parser.add_argument('--date', action='store', dest='date', help='Provide a date in the format %Y-%m-%d (if you do not want current date)')
 
     args = parser.parse_args()
-    
-    # Train set 
+
+    # Train set
     train_dir = args.train_dir
 
     # Val set
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     #     exit()
 
     #####################################################################################
-    # Creating tf writer and folders 
+    # Creating tf writer and folders
     #####################################################################################
     # Writer initialization.
     tf_runs = os.path.join(opt.experiments_dir, "tf_runs")
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     if train_log_dir == val_log_dir:
         train_log_dir = train_log_dir + "_0"
         val_log_dir = val_log_dir + "_1"
-    
+
     train_writer = SummaryWriter(train_log_dir)
     val_writer = SummaryWriter(val_log_dir)
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     training_models = os.path.join(opt.experiments_dir, "models")
     if not os.path.exists(training_models): os.mkdir(training_models)
     saving_model_dir = os.path.join(training_models, log_name)
-    if not os.path.exists(saving_model_dir): os.mkdir(saving_model_dir)    
+    if not os.path.exists(saving_model_dir): os.mkdir(saving_model_dir)
 
     #####################################################################################
     # Initializing: model, criterion, optimizer, learning scheduler...
@@ -109,12 +109,12 @@ if __name__ == "__main__":
     if opt.use_pretrained_model:
         assert os.path.isfile(saved_model), "\nModel {} does not exist. Please train a model from scratch or specify a valid path to a model.".format(saved_model)
         pretrained_dict = torch.load(saved_model)
-        
+
         if "chairs_things" in saved_model:
             model.flow_net.load_state_dict(pretrained_dict)
         else:
             if opt.model_module_to_load == "full_model":
-                # Load completely model            
+                # Load completely model
                 model.load_state_dict(pretrained_dict)
 
             elif opt.model_module_to_load == "full_model_execpt_depth":
@@ -143,7 +143,7 @@ if __name__ == "__main__":
                 # 1. filter out unnecessary keys
                 pretrained_dict = {k: v for k, v in pretrained_dict.items() if "flow_net" in k}
                 # 2. overwrite entries in the existing state dict
-                model_dict.update(pretrained_dict) 
+                model_dict.update(pretrained_dict)
                 # 3. load the new state dict
                 model.load_state_dict(model_dict)
             else:
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     n_all_model_params = int(sum([np.prod(p.size()) for p in model.parameters()]))
     n_trainable_model_params = int(sum([np.prod(p.size()) for p in filter(lambda p: p.requires_grad, model.parameters())]))
     print("Number of parameters: {0} / {1}".format(n_trainable_model_params, n_all_model_params))
-    
+
     n_all_flownet_params = int(sum([np.prod(p.size()) for p in model.flow_net.parameters()]))
     n_trainable_flownet_params = int(sum([np.prod(p.size()) for p in filter(lambda p: p.requires_grad, model.flow_net.parameters())]))
     print("-> Flow network: {0} / {1}".format(n_trainable_flownet_params, n_all_flownet_params))
@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     # Initialize snaphost manager for model snapshot creation.
     snapshot_manager = SnapshotManager(log_name, saving_model_dir)
-    
+
     # We count the execution time between evaluations.
     time_statistics = TimeStatistics()
 
@@ -214,13 +214,13 @@ if __name__ == "__main__":
     # VAL dataset
     #####################################################################################
     val_dataset = dataset.DeformDataset(
-        opt.dataset_base_dir, val_dir, 
+        opt.dataset_base_dir, val_dir,
         opt.image_width, opt.image_height, opt.max_boundary_dist
     )
 
     val_dataloader = torch.utils.data.DataLoader(
-        dataset=val_dataset, shuffle=opt.shuffle, 
-        batch_size=opt.batch_size, num_workers=num_val_workers, 
+        dataset=val_dataset, shuffle=opt.shuffle,
+        batch_size=opt.batch_size, num_workers=num_val_workers,
         collate_fn=dataset.DeformDataset.collate_with_padding, pin_memory=True
     )
 
@@ -237,13 +237,13 @@ if __name__ == "__main__":
     # TRAIN dataset
     #####################################################################################
     train_dataset = dataset.DeformDataset(
-        opt.dataset_base_dir, train_dir, 
+        opt.dataset_base_dir, train_dir,
         opt.image_width, opt.image_height, opt.max_boundary_dist
     )
 
     train_dataloader = torch.utils.data.DataLoader(
-        dataset=train_dataset, batch_size=opt.batch_size, 
-        shuffle=opt.shuffle, num_workers=num_train_workers, 
+        dataset=train_dataset, batch_size=opt.batch_size,
+        shuffle=opt.shuffle, num_workers=num_train_workers,
         collate_fn=dataset.DeformDataset.collate_with_padding, pin_memory=True
     )
 
@@ -265,7 +265,7 @@ if __name__ == "__main__":
             print("Epoch: {0}".format(epoch))
 
             num_consecutive_all_invalid_batches = 0
-            
+
             model.train()
             for i, data in enumerate(train_dataloader):
                 #####################################################################################
@@ -412,9 +412,9 @@ if __name__ == "__main__":
                 train_batch_forward_pass = timer()
 
                 model_data = model(
-                    source, target, 
-                    graph_nodes, graph_edges, graph_edges_weights, graph_clusters, 
-                    pixel_anchors, pixel_weights, 
+                    source, target,
+                    graph_nodes, graph_edges, graph_edges_weights, graph_clusters,
+                    pixel_anchors, pixel_weights,
                     num_nodes, intrinsics
                 )
                 source_depth_pred = model_data["depth_pred_data"][0][('depth', -1, -1)]
@@ -439,12 +439,12 @@ if __name__ == "__main__":
                             if mean_error > opt.gn_max_mean_translation_error:
                                 print("\t\tToo big mean translation error: {}".format(mean_error))
                                 model_data["valid_solve"][i] = 0
-                
+
                 with torch.no_grad():
                     # Downscale groundtruth flow
                     flow_gts, flow_masks = nnutils.downscale_gt_flow(
                         optical_flow_gt, optical_flow_mask, opt.image_height, opt.image_width
-                    )    
+                    )
 
                     # Compute mask gt for mask baseline
                     xy_coords_warped, gt_source_points,  source_points, valid_source_points, target_matches, \
@@ -452,7 +452,7 @@ if __name__ == "__main__":
                             deformed_points_subsampled = model_data["correspondence_info"]
 
                     mask_gt, valid_mask_pixels = nnutils.compute_baseline_mask_gt(
-                        xy_coords_warped, 
+                        xy_coords_warped,
                         target_matches, valid_target_matches,
                         gt_source_points, valid_source_points,
                         scene_flow_gt, scene_flow_mask, target_boundary_mask,
@@ -462,10 +462,10 @@ if __name__ == "__main__":
                     # Compute deformed point gt
                     deformed_points_gt, deformed_points_mask = nnutils.compute_deformed_points_gt(
                         gt_source_points, scene_flow_gt,
-                        model_data["valid_solve"], valid_correspondences, 
+                        model_data["valid_solve"], valid_correspondences,
                         deformed_points_idxs, deformed_points_subsampled
                     )
-                                    
+
                 #####################################################################################
                 # Loss.
                 #####################################################################################
@@ -477,7 +477,7 @@ if __name__ == "__main__":
                     flow_gts, model_data["flow_data"], flow_masks,
                     translations_gt, model_data["node_translations"], model_data["deformations_validity"],
                     deformed_points_gt, model_data["deformed_points_pred"], deformed_points_mask,
-                    model_data["valid_solve"], num_nodes, 
+                    model_data["valid_solve"], num_nodes,
                     model_data["mask_pred"], mask_gt, valid_mask_pixels
                 )
 
@@ -518,7 +518,7 @@ if __name__ == "__main__":
                         plot_grad_flow(model.named_parameters())
                     optimizer.step()
                     if opt.use_lr_scheduler: scheduler.step()
-                    
+
                 else:
                     print("No valid loss, skipping backpropagation!")
 
@@ -528,7 +528,7 @@ if __name__ == "__main__":
 
                 if iteration_number % opt.evaluation_frequency == 0:
                     # Store the latest model snapshot, if the required elased time has passed.
-                    snapshot_manager.save_model(model, iteration_number)  
+                    snapshot_manager.save_model(model, iteration_number)
 
                 iteration_number = iteration_number + 1
 
@@ -536,10 +536,10 @@ if __name__ == "__main__":
             print("Epoch {} complete".format(epoch))
             print("-------------------------------------------------------------------")
             print("-------------------------------------------------------------------")
-        
+
     except (KeyboardInterrupt, TypeError, ConnectionResetError) as err:
         # We also save the latest model snapshot at interruption.
-        snapshot_manager.save_model(model, iteration_number, final_iteration=True)  
+        snapshot_manager.save_model(model, iteration_number, final_iteration=True)
         raise err
 
     train_writer.close()
