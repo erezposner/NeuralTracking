@@ -10,10 +10,10 @@ experiments_dir     = os.path.join(workspace, "experiments")
 
 image_width = 640
 image_height = 448
-num_worker_threads = 4 # TODO 6
-num_threads = 6 # TODO 4
-
-num_samples_eval = 700
+num_worker_threads = 1 # TODO 6
+num_threads = 1 # TODO 4
+viz_debug = False
+num_samples_eval = 500
 
 #####################################################################################################################
 # MODEL INFO
@@ -23,7 +23,6 @@ num_samples_eval = 700
 # - In train.py, this info is only used if use_pretrained_model=True
 # - In generate.py, evaluate.py or example_viz.py, it is used regardless of the value of use_pretrained_model
 
-# use_pretrained_model = False # used only in train.py
 use_pretrained_model = True  # used only in train.py
 
 model_module_to_load = "full_model"    # A: "only_flow_net", B: "full_model", C: "full_model_execpt_depth", D:"depth_pred_net"
@@ -45,8 +44,10 @@ mode = "2_mask"  # ["_1_0_flow", "0_flow", "1_solver", "2_mask", "3_refine"]
 
 if mode == "0_flow":
     from settings.settings_flow import *
-elif mode == "_1_0_flow":
+elif mode == "0_depth":
     from settings.settings_depth import *
+elif mode == "0_0_flow_n_depth":
+    from settings.settings_flow_n_depth import *
 elif mode == "1_solver":
     from settings.settings_solver import *
 elif mode == "2_mask":

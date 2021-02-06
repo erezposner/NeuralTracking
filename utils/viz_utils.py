@@ -9,46 +9,51 @@ import torch
 
 
 def visualize_outputs(images_dict, writer, iteration_number, title=''):
-    show_optical_flow = False
+    show_optical_flow = True
     show_depth_pred = True
+    show_meshes_pred = True
+
     ######## Visualize optical flow prediction #########
     if show_optical_flow:
-        rows = 1
-        cols = 2
-        gt_flow_img = fz.convert_from_flow(images_dict['optical_flow_gt'][0].permute(1, 2, 0).detach().cpu().numpy())
-        pred_flow_img = fz.convert_from_flow(images_dict['optical_flow_pred'][0].permute(1, 2, 0).detach().cpu().numpy())
-
-        flow_mask = images_dict['optical_flow_mask'][0][0,...] # flow_mask is duplicated across the feature dimension
-        flow_mask_float = flow_mask.type(torch.int).detach().cpu().numpy()[...,None]
-
-        f = plt.figure(figsize=(15, 15))
-        ax = plt.Axes(f, [0., 0., 1., 1.])
-        ax.set_axis_off()
-        f.add_axes(ax)
-
-        a = f.add_subplot(rows, cols, 1)
-        a.set_title("gt_flow_img flow")
-        a.set_axis_off()
-
-        plt.imshow(gt_flow_img * flow_mask_float, cmap="jet")
-
-        a = f.add_subplot(rows, cols, 2)
-        a.set_axis_off()
-        a.set_title("pred_flow_img flow")
-        plt.imshow(pred_flow_img * flow_mask_float, cmap="jet")
-        f.tight_layout()
-
-        writer.add_figure(title + '_optical_flow', f, iteration_number, close=True)
+        plot_optical_flow(images_dict,writer,title,iteration_number)
 
     ######## Visualize depth prediction #########
     if show_depth_pred:
         plot_predicted_depth_maps(images_dict,writer,title,iteration_number)
 
+    ######## Visualize meshes prediction #########
+    if show_meshes_pred:
         plot_point_clouds(images_dict,writer,title,iteration_number)
     writer.close()
 
 
+def plot_optical_flow(images_dict,writer,title,iteration_number):
+    rows = 1
+    cols = 2
+    gt_flow_img = fz.convert_from_flow(images_dict['optical_flow_gt'][0].permute(1, 2, 0).detach().cpu().numpy())
+    pred_flow_img = fz.convert_from_flow(images_dict['optical_flow_pred'][0].permute(1, 2, 0).detach().cpu().numpy())
 
+    flow_mask = images_dict['optical_flow_mask'][0][0, ...]  # flow_mask is duplicated across the feature dimension
+    flow_mask_float = flow_mask.type(torch.int).detach().cpu().numpy()[..., None]
+
+    f = plt.figure(figsize=(6, 4))
+    ax = plt.Axes(f, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    f.add_axes(ax)
+
+    a = f.add_subplot(rows, cols, 1)
+    a.set_title("gt_flow_img flow")
+    a.set_axis_off()
+
+    plt.imshow(gt_flow_img * flow_mask_float, cmap="jet")
+
+    a = f.add_subplot(rows, cols, 2)
+    a.set_axis_off()
+    a.set_title("pred_flow_img flow")
+    plt.imshow(pred_flow_img * flow_mask_float, cmap="jet")
+    f.tight_layout()
+
+    writer.add_figure(title + '_optical_flow', f, iteration_number, close=True)
 def plot_point_clouds(images_dict,writer,title,iteration_number):
 
     ind = 0

@@ -9,6 +9,8 @@ freeze_depth_pred_net     = False
 freeze_optical_flow_net   = True
 freeze_mask_net           = True
 
+use_depth_prediction = True
+
 # Shuffle batch
 shuffle = True
 
@@ -79,7 +81,7 @@ use_adam = True
 use_batch_norm = False
 batch_size = 2
 evaluation_frequency = 2000 # in number of iterations
-epochs = 90
+epochs = 15
 learning_rate = 1e-4
 use_lr_scheduler = False
 step_lr = 10000

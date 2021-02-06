@@ -127,7 +127,7 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
 
             # Loss.
             loss, loss_depth_pred, loss_flow, loss_graph, loss_warp, loss_mask = criterion(
-                [source_depth_pred] , [source_depth_gt], [target_depth_pred] , [target_depth_gt],[optical_flow_mask],
+                [source_depth_pred], [source_depth_gt], [target_depth_pred], [target_depth_gt], [optical_flow_mask],
                 [optical_flow_gt], [optical_flow_pred], [optical_flow_mask],
                 translations_gt, model_data["node_translations"], model_data["deformations_validity"],
                 deformed_points_gt, model_data["deformed_points_pred"], deformed_points_mask,

@@ -162,7 +162,7 @@ class DeformNet(torch.nn.Module):
 
         ########################################################################
         # Compute intrinsics matrix
-        k_mat = torch.eye(4).repeat(opt.batch_size, 1, 1, 1).to('cuda')
+        k_mat = torch.eye(4).repeat(batch_size, 1, 1, 1).to('cuda')
         k_mat[:, :, 0, 0] = intrinsics[:, 0].unsqueeze(-1)
         k_mat[:, :, 1, 1] = intrinsics[:, 1].unsqueeze(-1)
         k_mat[:, :, 0, 2] = intrinsics[:, 2].unsqueeze(-1)
@@ -225,7 +225,7 @@ class DeformNet(torch.nn.Module):
 
         if opt.use_depth_prediction:
             try:
-                backproject = Backproject(opt.batch_size, opt.image_height, opt.image_width, 'cuda')
+                backproject = Backproject(batch_size, opt.image_height, opt.image_width, 'cuda')
                 pred_source_points = backproject.forward(x1_depth_pred[('depth', -1, -1)], k_inv_mat)
 
                 # plot_3d_data_debug([pred_source_points[0], source_points[0]], [x1[0, :3, :, :],0*x1[0, :3, :, :]])
@@ -241,7 +241,7 @@ class DeformNet(torch.nn.Module):
         x2_depth_pred[('depth', -1, -1)] = F.interpolate(x2_depth_pred[('depth', 0, 0)], [target_points.shape[2], target_points.shape[3]],mode="nearest")
         if opt.use_depth_prediction:
             try:
-                backproject = Backproject(opt.batch_size, opt.image_height, opt.image_width, 'cuda')
+                backproject = Backproject(batch_size, opt.image_height, opt.image_width, 'cuda')
                 pred_target_points = backproject.forward(x2_depth_pred[('depth', -1, -1)], k_inv_mat)
                 # plot_3d_data_debug([pred_target_points[0], target_points[0]], [x1[0, :3, :, :],0*x1[0, :3, :, :]])
                 target_points = pred_target_points

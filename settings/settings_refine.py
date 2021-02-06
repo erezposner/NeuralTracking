@@ -79,7 +79,7 @@ assert not (threshold_mask_predictions and patchwise_threshold_mask_predictions)
 #####################################################################################################################
 use_adam = False
 use_batch_norm = False
-batch_size = 4
+batch_size = 2
 evaluation_frequency = 2000 # in number of iterations
 epochs = 15
 learning_rate = 1e-5

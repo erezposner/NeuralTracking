@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # Creating tf writer and folders 
     #####################################################################################
     # Writer initialization.
-    tf_runs = os.path.join(opt.experiments_dir, "tf_runs_1")
+    tf_runs = os.path.join(opt.experiments_dir, "tf_runs")
     log_name = "{0}_{1}".format(date, experiment_name)
     log_dir = os.path.join(tf_runs, log_name)
 
@@ -151,7 +151,7 @@ if __name__ == "__main__":
                 exit()
 
     # Criterion.
-    criterion = DeformLoss(opt.lambda_depth_pred, opt.lambda_flow, opt.lambda_graph, opt.lambda_warp, opt.lambda_mask, opt.flow_loss_type)
+    criterion = DeformLoss(opt.lambda_depth_pred, opt.lambda_flow, opt.lambda_graph, opt.lambda_warp, opt.lambda_mask, opt.flow_loss_type,opt.flow_loss_type)
 
     # Count parameters.
     n_all_model_params = int(sum([np.prod(p.size()) for p in model.parameters()]))
@@ -473,7 +473,7 @@ if __name__ == "__main__":
 
                 # Compute Loss
                 loss = criterion(
-                    [source_depth_pred], [source_depth_gt], [target_depth_pred], [target_depth_gt],[optical_flow_mask],
+                    model_data["depth_pred_data"][0], [source_depth_gt], model_data["depth_pred_data"][1], [target_depth_gt],[optical_flow_mask],
                     flow_gts, model_data["flow_data"], flow_masks,
                     translations_gt, model_data["node_translations"], model_data["deformations_validity"],
                     deformed_points_gt, model_data["deformed_points_pred"], deformed_points_mask,

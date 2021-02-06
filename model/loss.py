@@ -4,6 +4,7 @@ import torch.nn as nn
 import options as opt
 import numpy as np
 import math
+import torch.nn.functional as F
 
 
 class DeformLoss(torch.nn.Module):
@@ -44,43 +45,72 @@ class DeformLoss(torch.nn.Module):
 
         d_depth_pred = None
         if opt.use_depth_pred_loss:
-            if len(source_depth_gt) == 1:
+            if len(source_depth_pred) == 1:
                 d_depth_pred = self.depth_pred_loss(source_depth_gt[0][:, -1, None, ...], source_depth_pred[0])
+                if opt.viz_debug:
+                    import matplotlib.pyplot as plt
+                    viz_max =4
+                    z_gt = source_depth_gt[0][0][2].detach().cpu().numpy()
+                    plt.imshow(z_gt)
+                    plt.clim(0, viz_max)
+                    plt.show()
 
+                    pred_vis = source_depth_pred[0][0][0].detach().cpu().numpy()
+                    plt.imshow(pred_vis * depth_pred_mask[0][0][0].detach().cpu().numpy())
+                    plt.clim(0, viz_max)
+                    plt.show()
 
-                # mask_interpolated = torch.nn.functional.interpolate(input=optical_flow_mask[0][:, 0, None, :, :].float(), size=(d_depth_pred.shape[2], d_depth_pred.shape[3]), mode='nearest')
-                # import matplotlib.pyplot as plt
-                # plt.imshow((d_depth_pred * mask_interpolated).detach().cpu().numpy()[0][0])
-                # z_gt = source_depth_gt[0][:, -1, None, ...].detach().cpu().numpy()
-                # norm_val = z_gt[0][0].max()
-                # depth_pred_source_Z =( (z_gt[0][0] * 255.0 ) / norm_val).astype(
-                #     np.uint8)
-                # plt.imshow(depth_pred_source_Z)
-                # pred_vis = (source_depth_pred[0][0][0].detach().cpu().numpy()*255.0 / norm_val).astype(
-                #     np.uint8)
-                # plt.imshow(pred_vis)
-                # plt.imshow(source_depth_gt[0][:, -1, None, ...][0][0].detach().cpu().numpy()*depth_pred_mask[0][0][0].detach().cpu().numpy())
-                # plt.imshow(source_depth_gt[0][:, -1, None, ...][0][0].detach().cpu().numpy())
-                # p = source_depth_gt[0][:, -1, None, ...][0][0].detach().cpu().numpy()*depth_pred_mask[0][0][0].detach().cpu().numpy()
-                # plt.clim(min(p.flatten()), max(p.flatten()))
-                # plt.show()
+                    z_gt = target_depth_gt[0][0][2].detach().cpu().numpy()
+                    plt.imshow(z_gt)
+                    plt.clim(0, viz_max)
+                    plt.show()
+
+                    pred_vis = target_depth_pred[0][0][0].detach().cpu().numpy()
+                    plt.imshow(pred_vis )
+                    plt.clim(0, viz_max)
+                    plt.show()
 
                 d_depth_pred_src = (d_depth_pred * depth_pred_mask[0])
                 d_depth_pred_trg = self.depth_pred_loss(target_depth_gt[0][:, -1, None, ...], target_depth_pred[0])
 
-                d_depth_pred = 0.8*d_depth_pred_src.mean() + 0.2*d_depth_pred_trg.mean()
+                d_depth_pred = 0.5*d_depth_pred_src.mean() + 0.5*d_depth_pred_trg.mean()
 
-            elif len(source_depth_gt) > 1:
+            elif len(source_depth_pred) > 1:
                 d_depth_pred = []
-                # for flow_gt, flow_pred, flow_mask in zip(flow_gts, flow_preds, flow_masks):
-                for idx in range(len(source_depth_gt)):
+
+                for key in source_depth_pred:
                     # It can happen that flow_gt has no valid values for coarser levels.
                     # In that case, that level is not constrained in the batch.
-                    f = self.depth_pred_loss(source_depth_gt[idx][:,-1, None,...], source_depth_pred[idx])
-                    assert f is not None, f
-                    f += (self.depth_pred_loss(target_depth_gt[idx][:,-1, None,...], target_depth_pred[idx])).mean()
+                    downsampled_source_depth_gt = F.interpolate(source_depth_gt[0][:, -1, None, ...], [source_depth_pred[key].shape[2],source_depth_pred[key].shape[3]],mode="nearest")
+                    downsampled_target_depth_gt = F.interpolate(target_depth_gt[0][:, -1, None, ...], [target_depth_pred[key].shape[2],target_depth_pred[key].shape[3]],mode="nearest")
+                    downsampled_depth_pred_mask = F.interpolate(depth_pred_mask[0][:, -1, None, ...].float(), [source_depth_pred[key].shape[2],source_depth_pred[key].shape[3]],mode="nearest")
 
-                    d_depth_pred.append(f)
+                    # assert f1 is not None, f1
+                    # assert f2 is not None, f2
+                    f1 = ((self.depth_pred_loss(downsampled_source_depth_gt, source_depth_pred[key]))*downsampled_depth_pred_mask).mean()
+                    f2 = (self.depth_pred_loss(downsampled_target_depth_gt, target_depth_pred[key])).mean()
+                    d_depth_pred.append(0.5 * f1 + 0.5 * f2)
+
+                    if opt.viz_debug:
+                        print(key)
+                        viz_max = 4
+                        for downsampled_gt, preds, mask in zip(
+                                [downsampled_source_depth_gt, downsampled_target_depth_gt],
+                                [source_depth_pred, target_depth_pred],
+                                [downsampled_depth_pred_mask, None]):
+                            import matplotlib.pyplot as plt
+                            z_gt = downsampled_gt[0][0].detach().cpu().numpy()
+                            plt.imshow(z_gt)
+                            plt.clim(0, viz_max)
+                            plt.show()
+                            pred_vis = (preds[key][0][0].detach().cpu().numpy())
+                            if mask is None:
+                                plt.imshow(pred_vis)
+                            else:
+                                plt.imshow(pred_vis * downsampled_depth_pred_mask[0][0].detach().cpu().numpy())
+                            plt.clim(0, viz_max)
+                            plt.show()
+
                 d_depth_pred = sum(d_depth_pred)
 
             d_total += self.lambda_depth_pred * d_depth_pred

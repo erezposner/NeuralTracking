@@ -68,6 +68,15 @@ def main():
         if opt.model_module_to_load == "full_model":
             # Load completely model            
             model.load_state_dict(pretrained_dict)
+        elif opt.model_module_to_load == "full_model_execpt_depth":
+            # Load everything except depth
+            model_dict = model.state_dict()
+            # 1. filter out unnecessary keys
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if "depth_pred_net" not in k}
+            # 2. overwrite entries in the existing state dict
+            model_dict.update(pretrained_dict)
+            # 3. load the new state dict
+            model.load_state_dict(model_dict)
         elif opt.model_module_to_load == "only_flow_net":
             # Load only optical flow part
             model_dict = model.state_dict()

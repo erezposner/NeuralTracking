@@ -52,33 +52,12 @@ def plot_3d_data_debug(pcls, pcls_colors=None):
             color = pcls_colors[i].permute(1, 2, 0).view(-1, 3).detach().cpu().numpy()
             point_cloud_0.colors = o3d.utility.Vector3dVector(color)
         else:
-            random_color = np.random.uniform(0, 1)
-            point_cloud_0.paint_uniform_color([1 * random_color, 0.706 * random_color, 0 * random_color])
+            random_color = np.random.uniform(0, 0.8, size=3)
+            point_cloud_0.paint_uniform_color(random_color)
+
         pcls_list.append(point_cloud_0)
 
     o3d.visualization.draw_geometries(pcls_list)
-
-# def plot_3d_data_debug(pcls, pcls_colors=None,is_dm = True):
-#     import open3d as o3d
-#     pcls_list = []
-#     for i in range(len(pcls)):
-#
-#         point_cloud_0 = o3d.geometry.PointCloud()
-#         if is_dm:
-#             point0 = pcls[i].squeeze().view(3, -1).permute(1, 0).detach().cpu().numpy()
-#         else:
-#             point0 = pcls[i].squeeze().permute(1, 0).detach().cpu().numpy()
-#
-#         point_cloud_0.points = o3d.utility.Vector3dVector(point0)
-#         if pcls_colors is not None:
-#             color = pcls_colors[i].permute(1, 2, 0).view(-1, 3).detach().cpu().numpy()
-#             point_cloud_0.colors = o3d.utility.Vector3dVector(color)
-#         else:
-#             random_color = np.random.uniform(0, 1)
-#             point_cloud_0.paint_uniform_color([1 * random_color, 0.706 * random_color, 0 * random_color])
-#         pcls_list.append(point_cloud_0)
-#
-#     o3d.visualization.draw_geometries(pcls_list)
 
 
 def show_mask_image(image_numpy):
