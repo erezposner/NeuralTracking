@@ -481,6 +481,46 @@ if __name__ == "__main__":
                     model_data["mask_pred"], mask_gt, valid_mask_pixels
                 )
 
+
+                #################### Display ################
+                if opt.viz_debug:
+                    optical_flow_pred = 20.0 * torch.nn.functional.interpolate(input=model_data["flow_data"][0],
+                                                                               size=(opt.image_height, opt.image_width),
+                                                                               mode='bilinear', align_corners=False)
+
+                    images = {
+                        "depth_pred_source": source_depth_pred,
+                        "depth_pred_target": target_depth_pred,
+                        "source_depth_gt": source_depth_gt,
+                        "target_depth_gt": target_depth_gt,
+                        "optical_flow_gt": optical_flow_gt,
+                        "optical_flow_pred": optical_flow_pred,
+                        "optical_flow_mask": optical_flow_mask,
+                        "source_point_cloud": {'vertices': source_points,
+                                               'colors': source[:, :3, :, :]},
+                        "deformed_points_pred": {'vertices': model_data["deformed_points_pred"],
+                                                 'colors': [None] * opt.batch_size},
+                        "deformed_points_gt": {'vertices': deformed_points_gt,
+                                               # 'colors': [None] * opt.batch_size},
+                                               'colors': torch.zeros_like(source[:, :3, :, :])},
+                    }
+                    from utils.utils import plot_3d_data_debug
+
+                    ind = np.where(model_data["valid_solve"].detach().cpu().numpy())[0]
+                    if len(ind)>0:
+                        ind =ind[0]
+                        pcls = [images['source_point_cloud']['vertices'][ind],
+                                target_depth_gt[ind],
+                                images['deformed_points_pred']['vertices'][ind],
+                                images['deformed_points_gt']['vertices'][ind]]
+
+                        pcls_colors = [images['source_point_cloud']['colors'][ind],
+                                       target[:,:3,:,:][ind],
+                                       images['deformed_points_pred']['colors'][ind],
+                                       images['deformed_points_gt']['colors'][ind]]
+
+                        plot_3d_data_debug(pcls=pcls, pcls_colors=pcls_colors)
+                ###########################################
                 time_statistics.loss_eval_duration += (timer() - train_batch_loss_eval)
 
                 #####################################################################################
