@@ -26,20 +26,22 @@ num_samples_eval = 50
 use_pretrained_model = True  # used only in train.py
 
 model_module_to_load = "full_model"    # A: "only_flow_net", B: "full_model", C: "full_model_execpt_depth", D:"depth_pred_net"
-# model_name           = "chairs_things"       # your model's name
-# model_name           = "2021-02-02_depth_pred_1"       # your model's name - 38000
-# model_name           = "2021-02-02_solver_0"       # your model's name - 60000
-model_name           = "2021-02-03_mask_1"       # your model's name - 34000
-# model_name           = "model_A"       # your model's name - 34000
-model_iteration      = 34000               # iteration number of the model you want to load
-# model_iteration      = 0               # iteration number of the model you want to load
+# model_name           = "model_A"                      # your model's name
+# model_name           = "2021-02-02_solver_0"          # model_iteration - 60000 # load with - full_model_execpt_depth_refine
+model_name           = "2021-02-06_flow_sp_0"           # model_iteration - 42000 # load with - full_model_execpt_depth_refine
+model_name           = "2021-02-08_depth_sp_0"          # model_iteration - 132000 # load with - full_model_execpt_depth_refine
+model_name           = "2021-02-09_solver_n_depth_sp_0" # model_iteration - 32000 # load with - full_model_execpt_depth_refine
+model_name           = "2021-02-09_solver_sp_1" # model_iteration - 0 # load with - full_model
+model_name           = "2021-02-09_mask_sp_0" # model_iteration - 20000 # load with - full_model
+model_name           = "2021-02-09_refine_sp_0" # model_iteration - 56000 # load with - full_model
+model_iteration      = 56000              # iteration number of the model you want to load
 
 saved_model = os.path.join(experiments_dir, "models", model_name, f"{model_name}_{model_iteration}.pt")
 
 #####################################################################################################################
 # TRAINING OPTIONS
 #####################################################################################################################
-mode = "2_mask"  # ["_1_0_flow", "0_flow", "1_solver", "2_mask", "3_refine"]
+mode = "3_refine"  # ["0_depth", "0_flow","0_0_solver_n_depth", "1_solver", "2_mask", "3_refine"]
 
 
 if mode == "0_flow":
