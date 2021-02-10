@@ -6,8 +6,8 @@ do_validation = True
 
 # Freeze parts of the model
 freeze_depth_pred_net     = False
-freeze_optical_flow_net   = False
-freeze_mask_net           = True
+freeze_optical_flow_net   = True
+freeze_mask_net           = False
 
 use_depth_prediction = True
 
@@ -15,7 +15,7 @@ use_depth_prediction = True
 shuffle = True
 
 # If true, we'll not run Gauss-Newton optimization
-skip_solver = True
+skip_solver = False
 
 
 #####################################################################################################################
@@ -33,9 +33,9 @@ gn_depth_sampling_mode = "bilinear" # "bilinear" or "nearest"
 gn_max_depth = 6.0
 gn_min_nodes = 4
 gn_max_nodes = 300
-gn_max_matches_train = 10000 
-gn_max_matches_train_per_batch = 100000 
-gn_max_matches_eval = 10000 
+gn_max_matches_train = 10000
+gn_max_matches_train_per_batch = 100000
+gn_max_matches_eval = 10000
 gn_max_warped_points = 100000
 gn_debug = False
 gn_print_timings = False
@@ -57,11 +57,11 @@ gn_max_mean_translation_error = 0.5
 #####################################################################################################################
 # Architecture parameters
 use_depth_pred_loss= True; lambda_depth_pred = 5.0
-use_flow_loss      = True; lambda_flow = 5.0
-use_graph_loss     = False; lambda_graph = 2.0
-use_warp_loss      = False; lambda_warp  = 2.0
+use_flow_loss      = False; lambda_flow = 5.0
+use_graph_loss     = True; lambda_graph = 2.0
+use_warp_loss      = True; lambda_warp  = 2.0
 use_mask           = False
-use_mask_loss      = False; lambda_mask = 1000.0 # one of the baselines in the paper
+use_mask_loss      = False; lambda_mask = 0.5 # one of the baselines in the paper
 
 flow_loss_type = 'RobustL1'
 
@@ -79,11 +79,11 @@ assert not (threshold_mask_predictions and patchwise_threshold_mask_predictions)
 #####################################################################################################################
 use_adam = True
 use_batch_norm = False
-batch_size = 2
+batch_size = 1
 evaluation_frequency = 2000 # in number of iterations
 epochs = 15
-learning_rate = 1e-4
-use_lr_scheduler = False
+learning_rate = 1e-5
+use_lr_scheduler = True
 step_lr = 10000
 weight_decay = 0.0
 momentum = 0.9

@@ -74,8 +74,8 @@ def plot_point_clouds(images_dict,writer,title,iteration_number):
 
     ### source_point_cloud
     p1 = source_point_cloud_vertices[ind].view(3, -1).permute(1, 0).unsqueeze(0)
-    p1[...,1]*=-1
-    p1[...,2]*=-1
+    p1[...,1] *= -1
+    p1[...,2] *= -1
     c1 =(source_point_cloud_colors[ind].view(3, -1).permute(1, 0).unsqueeze(0)*255).int()
     c1 = c1.type(torch.int64)
 
@@ -107,6 +107,7 @@ def plot_predicted_depth_maps(images_dict,writer,title,iteration_number):
     cols = 2
     depth_mask = images_dict['optical_flow_mask'][0][
         0, ...]  # flow_mask is duplicated across the feature dimension
+    depth_mask = torch.ones_like(depth_mask)
     depth_mask_float = depth_mask.type(torch.int).detach().cpu().numpy()
     f = plt.figure(figsize=(6, 4))
     ax = plt.Axes(f, [0., 0., 1., 1.])

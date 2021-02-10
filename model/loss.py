@@ -46,7 +46,21 @@ class DeformLoss(torch.nn.Module):
         d_depth_pred = None
         if opt.use_depth_pred_loss:
             if len(source_depth_pred) == 1:
+
+                ### weight depth error according to distance ###
+                depth_weighting_source = 1 / source_depth_gt[0][:, -1, None, ...].cuda()
+                depth_weighting_source[depth_weighting_source.isinf()] = 0
+
+                depth_weighting_target = (1 / target_depth_gt[0][:, -1, None, ...]).cuda()
+                depth_weighting_target[depth_weighting_target.isinf()] = 0
+                #################################################
+
                 d_depth_pred = self.depth_pred_loss(source_depth_gt[0][:, -1, None, ...], source_depth_pred[0])
+                d_depth_pred_src = (d_depth_pred * depth_pred_mask[0][:, -1, None, ...])
+                d_depth_pred_trg = self.depth_pred_loss(target_depth_gt[0][:, -1, None, ...], target_depth_pred[0])
+                d_depth_pred_src = d_depth_pred_src * depth_weighting_source
+                d_depth_pred_trg = d_depth_pred_trg * depth_weighting_target
+
                 if opt.viz_debug:
                     import matplotlib.pyplot as plt
                     viz_max =4
@@ -66,12 +80,21 @@ class DeformLoss(torch.nn.Module):
                     plt.show()
 
                     pred_vis = target_depth_pred[0][0][0].detach().cpu().numpy()
-                    plt.imshow(pred_vis )
+                    plt.imshow(pred_vis)
                     plt.clim(0, viz_max)
                     plt.show()
 
-                d_depth_pred_src = (d_depth_pred * depth_pred_mask[0])
-                d_depth_pred_trg = self.depth_pred_loss(target_depth_gt[0][:, -1, None, ...], target_depth_pred[0])
+                    viz_max_error = 0.1
+                    pred_vis = d_depth_pred_src[0][0].detach().cpu().numpy()
+                    plt.imshow(pred_vis)
+                    plt.clim(0, viz_max_error)
+                    plt.show()
+
+                    pred_vis = d_depth_pred_trg[0][0].detach().cpu().numpy()
+                    plt.imshow(pred_vis)
+                    plt.clim(0, viz_max_error)
+                    plt.show()
+
 
                 d_depth_pred = 0.5*d_depth_pred_src.mean() + 0.5*d_depth_pred_trg.mean()
 
@@ -79,17 +102,30 @@ class DeformLoss(torch.nn.Module):
                 d_depth_pred = []
 
                 for key in source_depth_pred:
+
+
                     # It can happen that flow_gt has no valid values for coarser levels.
                     # In that case, that level is not constrained in the batch.
                     downsampled_source_depth_gt = F.interpolate(source_depth_gt[0][:, -1, None, ...], [source_depth_pred[key].shape[2],source_depth_pred[key].shape[3]],mode="nearest")
                     downsampled_target_depth_gt = F.interpolate(target_depth_gt[0][:, -1, None, ...], [target_depth_pred[key].shape[2],target_depth_pred[key].shape[3]],mode="nearest")
                     downsampled_depth_pred_mask = F.interpolate(depth_pred_mask[0][:, -1, None, ...].float(), [source_depth_pred[key].shape[2],source_depth_pred[key].shape[3]],mode="nearest")
 
+                    ### weight depth error according to distance ###
+                    depth_weighting_source = 1 / downsampled_source_depth_gt.cuda()
+                    depth_weighting_source[depth_weighting_source.isinf()] = 0
+
+                    depth_weighting_target = (1 / downsampled_target_depth_gt).cuda()
+                    depth_weighting_target[depth_weighting_target.isinf()] = 0
+                    #################################################
+
                     # assert f1 is not None, f1
                     # assert f2 is not None, f2
-                    f1 = ((self.depth_pred_loss(downsampled_source_depth_gt, source_depth_pred[key]))*downsampled_depth_pred_mask).mean()
-                    f2 = (self.depth_pred_loss(downsampled_target_depth_gt, target_depth_pred[key])).mean()
-                    d_depth_pred.append(0.5 * f1 + 0.5 * f2)
+                    f1 = ((self.depth_pred_loss(downsampled_source_depth_gt, source_depth_pred[key])) * downsampled_depth_pred_mask)
+                    f2 = (self.depth_pred_loss(downsampled_target_depth_gt, target_depth_pred[key]))
+
+                    f1 = f1 * depth_weighting_source
+                    f2 = f2 * depth_weighting_target
+                    d_depth_pred.append(0.5 * f1.mean() + 0.5 * f2.mean())
 
                     if opt.viz_debug:
                         print(key)
@@ -111,7 +147,13 @@ class DeformLoss(torch.nn.Module):
                             plt.clim(0, viz_max)
                             plt.show()
 
-                d_depth_pred = sum(d_depth_pred)
+                            viz_max_error = 0.1
+                            pred_vis = self.depth_pred_loss(downsampled_gt, preds[key])[0][0].detach().cpu().numpy()
+                            plt.imshow(pred_vis)
+                            plt.clim(0, viz_max_error)
+                            plt.show()
+
+                d_depth_pred = sum(d_depth_pred) / len(d_depth_pred)
 
             d_total += self.lambda_depth_pred * d_depth_pred
 

@@ -56,8 +56,8 @@ gn_max_mean_translation_error = 0.5
 # Losses
 #####################################################################################################################
 # Architecture parameters
-use_depth_pred_loss= True; lambda_depth_pred = 5.0
-use_flow_loss      = True; lambda_flow = 5.0
+use_depth_pred_loss= True; lambda_depth_pred =10.0
+use_flow_loss      = True; lambda_flow = 10.0
 use_graph_loss     = True; lambda_graph = 2.0
 use_warp_loss      = True; lambda_warp  = 2.0
 use_mask           = True
@@ -77,9 +77,9 @@ assert not (threshold_mask_predictions and patchwise_threshold_mask_predictions)
 #####################################################################################################################
 # Learning parameters
 #####################################################################################################################
-use_adam = False
+use_adam = True
 use_batch_norm = False
-batch_size = 2
+batch_size = 1
 evaluation_frequency = 2000 # in number of iterations
 epochs = 15
 learning_rate = 1e-5

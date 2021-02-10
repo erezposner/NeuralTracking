@@ -10,10 +10,10 @@ experiments_dir     = os.path.join(workspace, "experiments")
 
 image_width = 640
 image_height = 448
-num_worker_threads = 1 # TODO 6
-num_threads = 1 # TODO 4
+num_worker_threads = 6 # TODO 6
+num_threads = 4 # TODO 4
 viz_debug = False
-num_samples_eval = 500
+num_samples_eval = 50
 
 #####################################################################################################################
 # MODEL INFO
@@ -46,8 +46,8 @@ if mode == "0_flow":
     from settings.settings_flow import *
 elif mode == "0_depth":
     from settings.settings_depth import *
-elif mode == "0_0_flow_n_depth":
-    from settings.settings_flow_n_depth import *
+elif mode == "0_0_solver_n_depth":
+    from settings.settings_solver_n_depth import *
 elif mode == "1_solver":
     from settings.settings_solver import *
 elif mode == "2_mask":

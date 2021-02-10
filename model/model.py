@@ -220,7 +220,7 @@ class DeformNet(torch.nn.Module):
         # Mask out invalid source points.
         source_points = x1[:, 3:, :, :].clone()
         gt_source_points = x1[:, 3:, :, :].clone()
-        x1_depth_pred[('depth', -1, -1)] = F.interpolate(x1_depth_pred[('depth', 0, 0)], [source_points.shape[2], source_points.shape[3]],mode="nearest")
+        # x1_depth_pred[('depth', -1, -1)] = F.interpolate(x1_depth_pred[('depth', 0, 0)], [source_points.shape[2], source_points.shape[3]],mode="nearest")
 
 
         if opt.use_depth_prediction:
@@ -238,7 +238,7 @@ class DeformNet(torch.nn.Module):
         # Sample target points at computed pixel locations.
         target_points = x2[:, 3:, :, :].clone()
         gt_target_points = x2[:, 3:, :, :].clone()
-        x2_depth_pred[('depth', -1, -1)] = F.interpolate(x2_depth_pred[('depth', 0, 0)], [target_points.shape[2], target_points.shape[3]],mode="nearest")
+        # x2_depth_pred[('depth', -1, -1)] = F.interpolate(x2_depth_pred[('depth', 0, 0)], [target_points.shape[2], target_points.shape[3]],mode="nearest")
         if opt.use_depth_prediction:
             try:
                 backproject = Backproject(batch_size, opt.image_height, opt.image_width, 'cuda')
@@ -333,8 +333,8 @@ class DeformNet(torch.nn.Module):
                 "valid_solve": valid_solve, 
                 "mask_pred": mask_pred,
                 "correspondence_info": [
-                    xy_coords_warped, 
-                    source_points, valid_source_points, 
+                    xy_coords_warped,
+                    gt_source_points, source_points, valid_source_points,
                     target_matches, valid_target_matches,
                     None, deformed_points_idxs, deformed_points_subsampled
                 ], 
