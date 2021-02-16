@@ -34,11 +34,11 @@ class DeformLoss(torch.nn.Module):
         self.warp_loss = L2_Warp()
 
 
-    def forward(self, source_depth_pred, source_depth_gt, target_depth_pred, target_depth_gt,depth_pred_mask,
+    def forward(self, source_depth_pred, source_depth_gt, target_depth_pred, target_depth_gt,depth_pred_mask,spec_depth_pred_mask,
                 flow_gts, flow_preds, flow_masks,
                 deformations_gt, deformations_pred, deformations_validity,
                 warped_points_gt, warped_points_pred, warped_points_mask,
-                valid_solve, num_nodes_vec, mask_pred, mask_gt, valid_pixels,
+                valid_solve, num_nodes_vec, mask_pred, mask_gt, valid_pixels,target_matches,
                 evaluate=False):
 
         d_total = torch.zeros((1), dtype=flow_preds[0].dtype, device=flow_preds[0].device)
@@ -50,9 +50,12 @@ class DeformLoss(torch.nn.Module):
                 ### weight depth error according to distance ###
                 depth_weighting_source = 1 / source_depth_gt[0][:, -1, None, ...].cuda()
                 depth_weighting_source[depth_weighting_source.isinf()] = 0
+                # depth_weighting_source = depth_weighting_source ** 3
 
                 depth_weighting_target = (1 / target_depth_gt[0][:, -1, None, ...]).cuda()
                 depth_weighting_target[depth_weighting_target.isinf()] = 0
+                # depth_weighting_target = depth_weighting_target ** 3
+
                 #################################################
 
                 d_depth_pred = self.depth_pred_loss(source_depth_gt[0][:, -1, None, ...], source_depth_pred[0])
@@ -100,7 +103,7 @@ class DeformLoss(torch.nn.Module):
 
             elif len(source_depth_pred) > 1:
                 d_depth_pred = []
-
+                source_depth_pred = {k: source_depth_pred[k] for k in [list(source_depth_pred.keys())[-1]]} #TODO use only last layer loss
                 for key in source_depth_pred:
 
 
@@ -113,9 +116,12 @@ class DeformLoss(torch.nn.Module):
                     ### weight depth error according to distance ###
                     depth_weighting_source = 1 / downsampled_source_depth_gt.cuda()
                     depth_weighting_source[depth_weighting_source.isinf()] = 0
+                    # depth_weighting_source = depth_weighting_source ** 3
 
                     depth_weighting_target = (1 / downsampled_target_depth_gt).cuda()
                     depth_weighting_target[depth_weighting_target.isinf()] = 0
+                    # depth_weighting_target = depth_weighting_target ** 3
+
                     #################################################
 
                     # assert f1 is not None, f1
@@ -153,8 +159,8 @@ class DeformLoss(torch.nn.Module):
                             plt.clim(0, viz_max_error)
                             plt.show()
 
-                d_depth_pred = sum(d_depth_pred) / len(d_depth_pred)
-
+                d_depth_pred = sum(d_depth_pred) / (len(d_depth_pred))
+                # d_depth_pred += (self.depth_pred_loss(target_matches[:,2,None,...] , source_depth_pred[('depth', -1, -1)] ) * spec_depth_pred_mask[0][:,0,None,...]).mean()
             d_total += self.lambda_depth_pred * d_depth_pred
 
         d_flow = None

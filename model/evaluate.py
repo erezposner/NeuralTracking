@@ -113,14 +113,14 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
             mask_gt, valid_mask_pixels = nnutils.compute_baseline_mask_gt(
                 xy_coords_warped,
                 target_matches, valid_target_matches,
-                source_points, valid_source_points,
+                gt_source_points, valid_source_points,
                 scene_flow_gt, scene_flow_mask, target_boundary_mask,
                 opt.max_pos_flowed_source_to_target_dist, opt.min_neg_flowed_source_to_target_dist
             )
 
             # Compute deformed point gt
             deformed_points_gt, deformed_points_mask = nnutils.compute_deformed_points_gt(
-                source_points, scene_flow_gt,
+                gt_source_points, scene_flow_gt,
                 model_data["valid_solve"], valid_correspondences,
                 deformed_points_idxs, deformed_points_subsampled
             )
@@ -128,12 +128,12 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
             # Loss.
             loss, loss_depth_pred, loss_flow, loss_graph, loss_warp, loss_mask = criterion(
                 # [source_depth_pred], [source_depth_gt], [target_depth_pred], [target_depth_gt], [optical_flow_mask],
-                [source_depth_pred], [source_depth_gt], [target_depth_pred], [target_depth_gt], [torch.ones_like(optical_flow_mask)],
+                [source_depth_pred], [source_depth_gt], [target_depth_pred], [target_depth_gt], [torch.ones_like(optical_flow_mask)],[optical_flow_mask],
                 [optical_flow_gt], [optical_flow_pred], [optical_flow_mask],
                 translations_gt, model_data["node_translations"], model_data["deformations_validity"],
                 deformed_points_gt, model_data["deformed_points_pred"], deformed_points_mask,
                 model_data["valid_solve"], num_nodes,
-                model_data["mask_pred"], mask_gt, valid_mask_pixels,
+                model_data["mask_pred"], mask_gt, valid_mask_pixels,target_matches,
                 evaluate=True
             )
             # #TODO Start from here

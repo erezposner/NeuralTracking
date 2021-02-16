@@ -1,4 +1,4 @@
-from utils.utils import Backproject, debug_pcls
+from utils.utils import Backproject, debug_pcls,ProjectPCL
 from .mono_fm_joint.net import mono_fm_joint
 import sys,os
 import torch.nn.functional as F
@@ -177,8 +177,59 @@ class DeformNet(torch.nn.Module):
         # assert torch.isfinite(flow2).all()
         # assert torch.isfinite(features2).all()
 
+        # x1_depth_pred = self.depth_pred(torch.cat((x1[:, :3, :, :], x2[:, :3, :, :]),dim=1))
+        # x2_depth_pred = self.depth_pred(torch.cat((x2[:, :3, :, :], x1[:, :3, :, :]),dim=1))
+        #TODO modify output so that it would agree with gt
+        x1_depthmap_scaler = x1[:, 5, :, :].view(batch_size,-1).max(dim=1)[0]
+        x2_depthmap_scaler = x2[:, 5, :, :].view(batch_size,-1).max(dim=1)[0]
+
         x1_depth_pred = self.depth_pred(x1[:, :3, :, :])
         x2_depth_pred = self.depth_pred(x2[:, :3, :, :])
+
+        x1_depth_pred[('depth', -1, -1)] = x1_depth_pred[('depth', -1, -1)] * x1_depthmap_scaler.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+        x2_depth_pred[('depth', -1, -1)] = x2_depth_pred[('depth', -1, -1)] * x2_depthmap_scaler.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+        if opt.use_depth_prediction:
+            project_pcl = ProjectPCL(batch_size, opt.image_height, opt.image_width, 'cuda')
+            # plot_3d_data_debug([graph_nodes[1],x1[:, 3:, :, :][1]],[None,x1[:, :3, :, :][1]])
+
+            graph_nodes_uvs = project_pcl.forward(graph_nodes, k_mat).floor()
+            if False:
+                import matplotlib.pyplot as plt
+                ind = 1
+                normalized = torch.div(graph_nodes[ind], graph_nodes[ind][:, None, 2]).transpose(1, 0)
+                normalized[torch.isnan(normalized)] = 0
+                pixels = torch.matmul(k_mat[ind][0][:3, :3], normalized).transpose(1, 0)
+                img = np.zeros((opt.image_height, opt.image_width, 3), np.uint8)
+
+                img = 255 * x1[ind, :3, :, :].permute(1, 2, 0).detach().cpu().numpy()
+                img = np.ascontiguousarray(img, dtype=np.uint8)
+                import cv2
+                plt.plot(graph_nodes_uvs[ind][:, 0].cpu().numpy(),graph_nodes_uvs[ind][:, 1].cpu().numpy(),'*r')
+                plt.show()
+                for j in range(len(pixels[:, 1])):
+                    cv2.circle(img, (graph_nodes_uvs[ind][j, 0].cpu().numpy().astype(np.uint64),
+                                     graph_nodes_uvs[ind][j, 1].cpu().numpy().astype(np.uint64)), 5,
+                               (0, 255, 0), -1)
+                plt.imshow(img)
+                plt.show()
+            depth = x1_depth_pred[('depth', -1, -1)]
+            # depth = x1[:, 3:, :, :][:, 2, None, ...]
+            # if (graph_nodes_uvs[:, :, 1]<0).any() or (graph_nodes_uvs[:, :, 1]>depth.shape[2]).any():
+            #     print('s')
+            # if (graph_nodes_uvs[:, :, 0]<0).any() or (graph_nodes_uvs[:, :, 0]>depth.shape[3]).any():
+            #     print('s')
+            valid = (graph_nodes_uvs[:, :, 0] >= 0) & (graph_nodes_uvs[:, :, 0] < depth.shape[3]) & (
+                        graph_nodes_uvs[:, :, 1] >= 0) & (graph_nodes_uvs[:, :, 1] < depth.shape[2])
+            depth_pred_per_node = graph_nodes.clone()[:,:,2]
+
+            for i in range(batch_size):
+                for k in range(graph_nodes_uvs.shape[1]):
+                    if valid[i][k]:
+                        depth_pred_per_node[i][k]= depth[i,:,graph_nodes_uvs[i, k, 1].long(),graph_nodes_uvs[i, k, 0].long()]
+            # depth_pred_per_node = torch.cat([depth[i,:, graph_nodes_uvs[i, :, 1].long(), graph_nodes_uvs[i, :, 0].long()] for i in range(batch_size)],dim=0)
+            # depth_pred_per_node[not_valid] = graph_nodes[not_valid]
+
+            graph_nodes = project_pcl.backproject(graph_nodes_uvs, depth_pred_per_node, k_inv_mat)
 
         flow = 20.0 * torch.nn.functional.interpolate(input=flow2, size=(image_height, image_width), mode='bilinear', align_corners=False)
 

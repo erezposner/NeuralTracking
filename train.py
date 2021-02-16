@@ -125,11 +125,20 @@ if __name__ == "__main__":
                 model_dict.update(pretrained_dict)
                 # 3. load the new state dict
                 model.load_state_dict(model_dict)
+            elif opt.model_module_to_load == "full_model_execpt_depth_fcn":
+                # Load everything except depth
+                model_dict = model.state_dict()
+                # 1. filter out unnecessary keys
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if "depth_pred.fcn" not in k}
+                # 2. overwrite entries in the existing state dict
+                model_dict.update(pretrained_dict)
+                # 3. load the new state dict
+                model.load_state_dict(model_dict)
             elif opt.model_module_to_load == "full_model_execpt_depth":
                 # Load everything except depth
                 model_dict = model.state_dict()
                 # 1. filter out unnecessary keys
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if "depth_pred_net" not in k}
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if "depth_pred" not in k}
                 # 2. overwrite entries in the existing state dict
                 model_dict.update(pretrained_dict)
                 # 3. load the new state dict
@@ -462,14 +471,14 @@ if __name__ == "__main__":
                     mask_gt, valid_mask_pixels = nnutils.compute_baseline_mask_gt(
                         xy_coords_warped,
                         target_matches, valid_target_matches,
-                        source_points, valid_source_points,
+                        gt_source_points, valid_source_points,
                         scene_flow_gt, scene_flow_mask, target_boundary_mask,
                         opt.max_pos_flowed_source_to_target_dist, opt.min_neg_flowed_source_to_target_dist
                     )
 
                     # Compute deformed point gt
                     deformed_points_gt, deformed_points_mask = nnutils.compute_deformed_points_gt(
-                        source_points, scene_flow_gt,
+                        gt_source_points, scene_flow_gt,
                         model_data["valid_solve"], valid_correspondences,
                         deformed_points_idxs, deformed_points_subsampled
                     )
@@ -481,13 +490,13 @@ if __name__ == "__main__":
 
                 # Compute Loss
                 loss = criterion(
-                    # model_data["depth_pred_data"][0], [source_depth_gt], model_data["depth_pred_data"][1], [target_depth_gt],[optical_flow_mask],
-                    model_data["depth_pred_data"][0], [source_depth_gt], model_data["depth_pred_data"][1], [target_depth_gt],[torch.ones_like(optical_flow_mask)],
+                    # model_data["depth_pred_data"][0], [source_depth_gt], model_data["depth_pred_data"][1], [target_depth_gt],[optical_flow_mask],[optical_flow_mask],
+                    model_data["depth_pred_data"][0], [source_depth_gt], model_data["depth_pred_data"][1], [target_depth_gt],[torch.ones_like(optical_flow_mask)],[optical_flow_mask],
                     flow_gts, model_data["flow_data"], flow_masks,
                     translations_gt, model_data["node_translations"], model_data["deformations_validity"],
                     deformed_points_gt, model_data["deformed_points_pred"], deformed_points_mask,
                     model_data["valid_solve"], num_nodes,
-                    model_data["mask_pred"], mask_gt, valid_mask_pixels
+                    model_data["mask_pred"], mask_gt, valid_mask_pixels, target_matches
                 )
 
 
@@ -524,7 +533,7 @@ if __name__ == "__main__":
                                 images['deformed_points_gt']['vertices'][ind]]
 
                         pcls_colors = [images['source_point_cloud']['colors'][ind],
-                                       target[:,:3,:,:][ind],
+                                       target[:, :3, :, :][ind],
                                        images['deformed_points_pred']['colors'][ind],
                                        images['deformed_points_gt']['colors'][ind]]
 

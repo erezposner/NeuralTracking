@@ -598,6 +598,25 @@ def find_best_model_name(model_dirname, data_version, verbose=False):
 
     return os.path.splitext(best_model_name)[0]
 
+class ProjectPCL(nn.Module):
+    def __init__(self,  batch_size, height, width, device):
+        super(ProjectPCL, self).__init__()
+
+        self.batch_size = batch_size
+        self.height = height
+        self.width = width
+        self.device = device
+
+    def forward(self, pcl, K):
+        normalized_pcl = torch.div(pcl,pcl[...,2,None])
+        normalized_pcl[torch.isnan(normalized_pcl)]=0
+        cam_points = torch.matmul(K[:,0, :3, :3],normalized_pcl.permute(0,2,1))
+        return cam_points.permute(0,2,1)
+
+    def backproject(self,uvs,depth, inv_K):
+        cam_points = torch.matmul(inv_K[:, 0, :3, :3], uvs.permute(0,2,1))
+        cam_points = depth.view(self.batch_size, 1, -1) * cam_points
+        return cam_points.permute(0, 2, 1)
 class Backproject(nn.Module):
     def __init__(self, batch_size, height, width, device):
         super(Backproject, self).__init__()
