@@ -32,7 +32,7 @@ class Pix2PixModel(BaseModel):
 
         return parser
 
-    def __init__(self,g):
+    def __init__(self,g,d):
 
         opt.beta1 = 0.5
         opt.lambda_L1 = 1000
@@ -59,8 +59,7 @@ class Pix2PixModel(BaseModel):
         # self.netG = networks.define_G(3, 1, 64, 'resnet_9blocks', 'instance',
         #                               not True, 'normal', 0.02).to(self.device)
         self.netG = g#g.to(self.device)
-        self.netD = networks.define_D(3 + 1, 64, 'basic',
-                                      3, 'instance', 'normal', 2).to(self.device)
+        self.netD = d
         self.loss_G = -1
         self.loss_D = -1
         self.loss_G_L1 = -1

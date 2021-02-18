@@ -18,7 +18,7 @@ from decimal import Decimal
 import options as opt
 import utils.query as query
 from utils.nnutils import make_conv_2d, make_upscale_2d, make_downscale_2d, ResBlock2d, Identity
-from model import pwcnet
+from model import pwcnet, networks
 
 from NeuralNRT._C import compute_pixel_anchors_geodesic as compute_pixel_anchors_geodesic_c
 from NeuralNRT._C import compute_pixel_anchors_euclidean as compute_pixel_anchors_euclidean_c
@@ -105,9 +105,13 @@ class DeformNet(torch.nn.Module):
         # depth prediction network
         # self.depth_pred = UNet(n_channels=3, bilinear=True)
         self.depth_pred = mono_fm_joint(n_channels=3)
+        self.depth_descriminator = networks.define_D(3 + 1, 64, 'basic',
+                          3, 'instance', 'normal', 2)
         if opt.freeze_depth_pred_net:
             # Freeze
             for param in self.depth_pred.parameters():
+                param.requires_grad = False
+            for param in self.depth_descriminator.parameters():
                 param.requires_grad = False
 
         # Optical flow network
