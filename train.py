@@ -12,8 +12,9 @@ from skimage import io
 import math
 import torchvision.models as models
 
-from model import evaluate
+from model import evaluate, networks
 from model import dataset
+from model.Pix2PixModel import Pix2PixModel
 from utils import utils
 import options as opt
 from utils.snapshot_manager import SnapshotManager
@@ -105,6 +106,7 @@ if __name__ == "__main__":
     iteration_number = 0
 
     model = DeformNet().cuda()
+    # depth_module = Pix2PixModel()
 
     if opt.use_pretrained_model:
         assert os.path.isfile(saved_model), "\nModel {} does not exist. Please train a model from scratch or specify a valid path to a model.".format(saved_model)
@@ -166,6 +168,7 @@ if __name__ == "__main__":
             else:
                 print(opt.model_module_to_load, "is not a valid argument (A: 'full_model', B: 'only_flow_net')")
                 exit()
+    depth_module = Pix2PixModel(model.depth_pred)
 
     # Criterion.
     criterion = DeformLoss(opt.lambda_depth_pred, opt.lambda_flow, opt.lambda_graph, opt.lambda_warp, opt.lambda_mask, opt.flow_loss_type,opt.flow_loss_type)
@@ -284,12 +287,16 @@ if __name__ == "__main__":
             num_consecutive_all_invalid_batches = 0
 
             model.train()
+            depth_module.netG.train()
+            depth_module.netD.train()
             for i, data in enumerate(train_dataloader):
                 #####################################################################################
                 # Validation.
                 #####################################################################################
                 if opt.do_validation and iteration_number % opt.evaluation_frequency == 0:
                     model.eval()
+                    depth_module.netG.eval()
+                    depth_module.netD.eval()
 
                     eval_start = timer()
 
@@ -299,11 +306,11 @@ if __name__ == "__main__":
 
                     print()
                     print("Train evaluation")
-                    train_losses, train_metrics, train_debug_images = evaluate.evaluate(model, criterion, train_dataloader, num_eval_batches, "train",export_images=True)
+                    train_losses, train_metrics, train_debug_images = evaluate.evaluate(model, depth_module, criterion, train_dataloader, num_eval_batches, "train",export_images=True)
 
                     print()
                     print("Val   evaluation")
-                    val_losses, val_metrics, val_debug_images     = evaluate.evaluate(model, criterion, val_dataloader, num_eval_batches, "val",export_images=True)
+                    val_losses, val_metrics, val_debug_images     = evaluate.evaluate(model, depth_module,criterion, val_dataloader, num_eval_batches, "val",export_images=True)
 
                     train_writer.add_scalar('Loss/Loss',        train_losses["total"],      iteration_number)
                     train_writer.add_scalar('Loss/Depth_Pred',  train_losses["depth_pred"], iteration_number)
@@ -311,6 +318,8 @@ if __name__ == "__main__":
                     train_writer.add_scalar('Loss/Graph',       train_losses["graph"],      iteration_number)
                     train_writer.add_scalar('Loss/Warp',        train_losses["warp"],       iteration_number)
                     train_writer.add_scalar('Loss/Mask',        train_losses["mask"],       iteration_number)
+                    train_writer.add_scalar('Loss/G',           depth_module.loss_G,       iteration_number)
+                    train_writer.add_scalar('Loss/D',           depth_module.loss_D,       iteration_number)
 
                     train_writer.add_scalar('Metrics/EPE_2D_0',             train_metrics["epe2d_0"],      iteration_number)
                     train_writer.add_scalar('Metrics/EPE_2D_2',             train_metrics["epe2d_2"],      iteration_number)
@@ -358,6 +367,9 @@ if __name__ == "__main__":
                     print("{:<40} {}".format("Current Val Loss GRAPH",      val_losses["graph"]))
                     print("{:<40} {}".format("Current Val Loss WARP",       val_losses["warp"]))
                     print("{:<40} {}".format("Current Val Loss MASK",       val_losses["mask"]))
+                    print("{:<40} {}".format("Current Val Loss MASK",       val_losses["mask"]))
+                    print("{:<40} {}".format("Current Val Loss G",       depth_module.loss_G))
+                    print("{:<40} {}".format("Current Val Loss D",       depth_module.loss_D))
                     print()
                     print("{:<40} {}".format("Current Val EPE 2D_0",            val_metrics["epe2d_0"]))
                     print("{:<40} {}".format("Current Val EPE 2D_2",            val_metrics["epe2d_2"]))
@@ -387,6 +399,8 @@ if __name__ == "__main__":
                     sys.stdout.flush()
 
                     model.train()
+                    depth_module.netG.train()
+                    depth_module.netD.train()
 
                 else:
                     sys.stdout.write("\r############# Train iteration: {0} / {1} (of Epoch {2}) - {3}".format(
@@ -427,15 +441,17 @@ if __name__ == "__main__":
                 # Forward pass.
                 #####################################################################################
                 train_batch_forward_pass = timer()
+                depth_module.set_input(source, target)
+                source_depth_pred , target_depth_pred = depth_module.optimize_parameters()
 
                 model_data = model(
                     source, target,
                     graph_nodes, graph_edges, graph_edges_weights, graph_clusters,
                     pixel_anchors, pixel_weights,
-                    num_nodes, intrinsics
+                    num_nodes, intrinsics , depth_preds=[source_depth_pred , target_depth_pred]
                 )
-                source_depth_pred = model_data["depth_pred_data"][0][('depth', -1, -1)]
-                target_depth_pred = model_data["depth_pred_data"][1][('depth', -1, -1)]
+                # source_depth_pred = model_data["depth_pred_data"][0][('depth', -1, -1)]
+                # target_depth_pred = model_data["depth_pred_data"][1][('depth', -1, -1)]
                 time_statistics.forward_duration += (timer() - train_batch_forward_pass)
 
                 # Invalidate too for too far away estimations, since they can produce

@@ -142,7 +142,7 @@ class DeformNet(torch.nn.Module):
         graph_nodes, graph_edges, graph_edges_weights, graph_clusters,
         pixel_anchors, pixel_weights, 
         num_nodes_vec, intrinsics, 
-        evaluate=False, split="train"
+        evaluate=False, split="train" , depth_preds=None
     ):
         batch_size = x1.shape[0]
 
@@ -180,14 +180,19 @@ class DeformNet(torch.nn.Module):
         # x1_depth_pred = self.depth_pred(torch.cat((x1[:, :3, :, :], x2[:, :3, :, :]),dim=1))
         # x2_depth_pred = self.depth_pred(torch.cat((x2[:, :3, :, :], x1[:, :3, :, :]),dim=1))
         #TODO modify output so that it would agree with gt
-        x1_depthmap_scaler = x1[:, 5, :, :].view(batch_size,-1).max(dim=1)[0]
-        x2_depthmap_scaler = x2[:, 5, :, :].view(batch_size,-1).max(dim=1)[0]
+        # x1_depthmap_scaler = x1[:, 5, :, :].view(batch_size,-1).max(dim=1)[0]
+        # x2_depthmap_scaler = x2[:, 5, :, :].view(batch_size,-1).max(dim=1)[0]
+        if depth_preds is not None:
+            x1_depth_pred={}
+            x2_depth_pred={}
+            x1_depth_pred[('depth', -1, -1)] = depth_preds[0]
+            x2_depth_pred[('depth', -1, -1)] = depth_preds[1]
+        else:
+            x1_depth_pred = self.depth_pred(x1[:, :3, :, :])
+            x2_depth_pred = self.depth_pred(x2[:, :3, :, :])
 
-        x1_depth_pred = self.depth_pred(x1[:, :3, :, :])
-        x2_depth_pred = self.depth_pred(x2[:, :3, :, :])
-
-        x1_depth_pred[('depth', -1, -1)] = x1_depth_pred[('depth', -1, -1)] * x1_depthmap_scaler.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-        x2_depth_pred[('depth', -1, -1)] = x2_depth_pred[('depth', -1, -1)] * x2_depthmap_scaler.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+        # x1_depth_pred[('depth', -1, -1)] = x1_depth_pred[('depth', -1, -1)] * x1_depthmap_scaler.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+        # x2_depth_pred[('depth', -1, -1)] = x2_depth_pred[('depth', -1, -1)] * x2_depthmap_scaler.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
         if opt.use_depth_prediction:
             project_pcl = ProjectPCL(batch_size, opt.image_height, opt.image_width, 'cuda')
             # plot_3d_data_debug([graph_nodes[1],x1[:, 3:, :, :][1]],[None,x1[:, :3, :, :][1]])
@@ -294,7 +299,7 @@ class DeformNet(torch.nn.Module):
             try:
                 backproject = Backproject(batch_size, opt.image_height, opt.image_width, 'cuda')
                 pred_target_points = backproject.forward(x2_depth_pred[('depth', -1, -1)], k_inv_mat)
-                # plot_3d_data_debug([pred_target_points[0], target_points[0]], [x1[0, :3, :, :],0*x1[0, :3, :, :]])
+                # plot_3d_data_debug([pred_target_points[0], target_points[0]], [x2[0, :3, :, :],0*x2[0, :3, :, :]])
                 target_points = pred_target_points
                 # target_points[:, -1, None, :, :] = x2_depth_pred[('depth', -1, -1)]
             except:

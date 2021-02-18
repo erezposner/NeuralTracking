@@ -11,7 +11,7 @@ from utils import nnutils
 from utils.utils import  plot_3d_data_debug
 
 
-def evaluate(model, criterion, dataloader, batch_num, split,export_images=False):
+def evaluate(model, depth_module,criterion, dataloader, batch_num, split,export_images=False,use_gan=True):
     dataset_obj = dataloader.dataset
     dataset_batch_size = dataloader.batch_size
     total_size = len(dataset_obj)
@@ -86,15 +86,24 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
 
         with torch.no_grad():
             # Predictions.
+            depth_module.set_input(source, target)
+            source_depth_pred={}
+            target_depth_pred={}
+
+            source_depth_pred[('depth', -1, -1)], target_depth_pred[('depth', -1, -1)] = depth_module.test()
             model_data = model(
                 source, target,
                 graph_nodes, graph_edges, graph_edges_weights, graph_clusters,
                 pixel_anchors, pixel_weights,
                 num_nodes, intrinsics,
-                evaluate=True, split=split
+                evaluate=True, split=split,depth_preds=[source_depth_pred[('depth', -1, -1)], target_depth_pred[('depth', -1, -1)] ]
             )
-            source_depth_pred = model_data["depth_pred_data"][0][('depth', -1, -1)]
-            target_depth_pred = model_data["depth_pred_data"][1][('depth', -1, -1)]
+            if use_gan:
+                source_depth_pred = source_depth_pred[('depth', -1, -1)]
+                target_depth_pred = target_depth_pred[('depth', -1, -1)]
+            else:
+                source_depth_pred = model_data["depth_pred_data"][0][('depth', -1, -1)]
+                target_depth_pred = model_data["depth_pred_data"][1][('depth', -1, -1)]
             source_depth_gt = source[:, 3:, :, :]
             target_depth_gt = target[:, 3:, :, :]
             optical_flow_pred2 = model_data["flow_data"][0]
@@ -137,7 +146,7 @@ def evaluate(model, criterion, dataloader, batch_num, split,export_images=False)
                 evaluate=True
             )
             # #TODO Start from here
-            # ind = 1
+            # ind = 0
             # pcls = [source_points[ind],model_data["deformed_points_pred"][ind],deformed_points_gt[ind]]
             # # pcls = [deformed_points_gt[ind],model_data["deformed_points_pred"][ind]]
             # # pcls = [deformed_points_gt[ind]]
