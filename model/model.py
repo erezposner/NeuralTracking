@@ -1,4 +1,5 @@
 from utils.utils import Backproject, debug_pcls,ProjectPCL
+from .mono_fm.net import mono_fm
 from .mono_fm_joint.net import mono_fm_joint
 import sys,os
 import torch.nn.functional as F
@@ -104,7 +105,13 @@ class DeformNet(torch.nn.Module):
         self.gn_lm_factor = 0.1
         # depth prediction network
         # self.depth_pred = UNet(n_channels=3, bilinear=True)
-        self.depth_pred = mono_fm_joint(n_channels=3)
+        # self.depth_pred = mono_fm_joint(n_channels=3)
+
+        self.depth_pred = mono_fm()
+        # model_path = 'experiments/models/fm_depth.pth'  # path to model weight
+        #
+        # checkpoint = torch.load(model_path)
+        # self.depth_pred.load_state_dict(checkpoint['state_dict'], strict=False)
         self.depth_descriminator = networks.define_D(3 + 1, 64, 'basic',
                           3, 'instance', 'normal', 2)
         if opt.freeze_depth_pred_net:
