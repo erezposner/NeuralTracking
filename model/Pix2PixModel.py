@@ -32,12 +32,12 @@ class Pix2PixModel(BaseModel):
 
         return parser
 
-    def __init__(self,g,d):
+    def __init__(self, g, d):
 
         opt.beta1 = 0.5
-        opt.lambda_L1 = 1000
+        opt.lambda_L1 = 10
         opt.gan_mode = 'lsgan'
-        opt.device= 'cuda'
+        opt.device = 'cuda'
 
         self.opt = opt
         self.device = opt.device
@@ -58,7 +58,7 @@ class Pix2PixModel(BaseModel):
         # define networks (both generator and discriminator)
         # self.netG = networks.define_G(3, 1, 64, 'resnet_9blocks', 'instance',
         #                               not True, 'normal', 0.02).to(self.device)
-        self.netG = g#g.to(self.device)
+        self.netG = g  # g.to(self.device)
         self.netD = d
         self.loss_G = -1
         self.loss_D = -1
@@ -80,12 +80,10 @@ class Pix2PixModel(BaseModel):
             input (dict): include the data itself and its metadata information.
         The option 'direction' can be used to swap images in domain A and domain B.
         """
-        self.real_A = torch.cat((source[:,:3,:,:],target[:,:3,:,:]),dim=0).to(self.device)
-        self.real_B = torch.cat((source[:,5,None,:,:],target[:,5,None,:,:]),dim=0).to(self.device)
+        self.real_A = torch.cat((source[:, :3, :, :], target[:, :3, :, :]), dim=0).to(self.device)
+        self.real_B = torch.cat((source[:, 5, None, :, :], target[:, 5, None, :, :]), dim=0).to(self.device)
         self.depth_mask = self.real_B > 0
-        self.depth_scaler = self.real_B.view(self.real_B.shape[0],-1).max(dim=1)[0]
-
-
+        self.depth_scaler = self.real_B.view(self.real_B.shape[0], -1).max(dim=1)[0]
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -93,11 +91,11 @@ class Pix2PixModel(BaseModel):
         self.fake_B = self.fake_B * self.depth_mask
         self.fake_B = self.fake_B * self.depth_scaler.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
 
-
-    def  backward_D(self):
+    def backward_D(self):
         """Calculate GAN loss for the discriminator"""
         # Fake; stop backprop to the generator by detaching fake_B
-        fake_AB = torch.cat((self.real_A, self.fake_B), 1)  # we use conditional GANs; we need to feed both input and output to the discriminator
+        fake_AB = torch.cat((self.real_A, self.fake_B),
+                            1)  # we use conditional GANs; we need to feed both input and output to the discriminator
         pred_fake = self.netD(fake_AB.detach())
         self.loss_D_fake = self.criterionGAN(pred_fake, False)
         # Real
@@ -122,23 +120,23 @@ class Pix2PixModel(BaseModel):
         self.loss_G.backward()
 
     def test(self):
-        self.forward()                   # compute fake images: G(A)
-        return self.fake_B[:opt.batch_size,...],  self.fake_B[opt.batch_size:,...]
+        self.forward()  # compute fake images: G(A)
+        return self.fake_B[:opt.batch_size, ...], self.fake_B[opt.batch_size:, ...]
 
-    def optimize_parameters(self):
-        iteration = 5
+    def optimize_parameters(self, epoch=10):
+        iteration = 3
         for i in range(iteration):  # discriminator-generator balancing
 
-            self.forward()                   # compute fake images: G(A)
-            if i == iteration - 1:
+            self.forward()  # compute fake images: G(A)
+            if i == iteration - 1 and epoch > 3:
                 # update D
                 self.set_requires_grad(self.netD, True)  # enable backprop for D
-                self.optimizer_D.zero_grad()     # set D's gradients to zero
-                self.backward_D()                # calculate gradients for D
-                self.optimizer_D.step()          # update D's weights
+                self.optimizer_D.zero_grad()  # set D's gradients to zero
+                self.backward_D()  # calculate gradients for D
+                self.optimizer_D.step()  # update D's weights
             # update G
             self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
-            self.optimizer_G.zero_grad()        # set G's gradients to zero
-            self.backward_G()                   # calculate graidents for G
-            self.optimizer_G.step()             # udpate G's weights
-        return self.fake_B[:opt.batch_size,...],  self.fake_B[opt.batch_size:,...]
+            self.optimizer_G.zero_grad()  # set G's gradients to zero
+            self.backward_G()  # calculate graidents for G
+            self.optimizer_G.step()  # udpate G's weights
+        return self.fake_B[:opt.batch_size, ...], self.fake_B[opt.batch_size:, ...]

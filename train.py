@@ -169,6 +169,10 @@ if __name__ == "__main__":
                 exit()
     depth_module = Pix2PixModel(model.depth_pred,model.depth_descriminator)
 
+    # TODO once
+    # pretrained_dict1 = torch.load('experiments/models/EUROC.pth')
+    # model.depth_pred.load_state_dict(pretrained_dict1['state_dict'],strict=False)
+
     # Criterion.
     criterion = DeformLoss(opt.lambda_depth_pred, opt.lambda_flow, opt.lambda_graph, opt.lambda_warp, opt.lambda_mask, opt.flow_loss_type,opt.flow_loss_type)
 
@@ -443,7 +447,7 @@ if __name__ == "__main__":
                 #####################################################################################
                 train_batch_forward_pass = timer()
                 depth_module.set_input(source, target)
-                source_depth_pred , target_depth_pred = depth_module.optimize_parameters()
+                source_depth_pred , target_depth_pred = depth_module.optimize_parameters(epoch=epoch)
 
                 model_data = model(
                     source, target,
