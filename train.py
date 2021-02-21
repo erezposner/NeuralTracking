@@ -167,9 +167,9 @@ if __name__ == "__main__":
             else:
                 print(opt.model_module_to_load, "is not a valid argument (A: 'full_model', B: 'only_flow_net')")
                 exit()
-    model_path = 'experiments/models/fm_depth.pth'  # path to model weight
-    checkpoint = torch.load(model_path)
-    model.depth_pred.load_state_dict(checkpoint['state_dict'], strict=False)
+    # model_path = 'experiments/models/fm_depth.pth'  # path to model weight
+    # checkpoint = torch.load(model_path)
+    # model.depth_pred.load_state_dict(checkpoint['state_dict'], strict=False)
     depth_module = Pix2PixModel(model.depth_pred,model.depth_descriminator)
 
     # TODO once
